@@ -1,7 +1,7 @@
 ## burn() plots when (time - start) %% .plotInterval < 1, to the devices named in `.plots`.
 
 ig <- data.table::data.table(pixelID = 1L, escapes = 1L, escaped = TRUE)
-figDir <- function() file.path(toyPaths()$outputPath, "figures", "fireSense")
+figDir <- function() file.path(toyPaths()$outputPath, "figures", "fireSense_burn")
 
 test_that(".plots = 'png' writes one figure per plotting year and registers it", {
   unlink(figDir(), recursive = TRUE)

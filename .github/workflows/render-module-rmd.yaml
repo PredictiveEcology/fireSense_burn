@@ -20,8 +20,8 @@ on:
       - development
     paths:
       - .github/workflows/render-module-rmd.yaml
-      - fireSense.Rmd
-      - fireSense.R
+      - fireSense_burn.Rmd
+      - fireSense_burn.R
   workflow_dispatch:
 
 jobs:
@@ -35,4 +35,4 @@ jobs:
       contents: write
     uses: PredictiveEcology/actions/.github/workflows/render-module-rmd.yaml@main
     with:
-      module: fireSense
+      module: fireSense_burn

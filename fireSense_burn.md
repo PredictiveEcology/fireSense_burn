@@ -1,5 +1,5 @@
 ---
-title: "fireSense Manual"
+title: "fireSense_burn Manual"
 subtitle: "v.0.0.0.9000"
 date: "Last updated: 2026-09-25"
 output:
@@ -12,15 +12,15 @@ output:
     keep_md: yes
 editor_options:
   chunk_output_type: console
-  bibliography: citations/references_fireSense.bib
+  bibliography: citations/references_fireSense_burn.bib
 link-citations: true
 always_allow_html: true
 ---
 
-# fireSense Module
+# fireSense_burn Module
 
 <!-- the following are text references used in captions for LaTeX compatibility -->
-(ref:fireSense) *fireSense*
+(ref:fireSense_burn) *fireSense_burn*
 
 
 
@@ -39,16 +39,16 @@ A landscape fire model sensitive to environmental changes (e.g., weather and lan
 
 ### Module summary
 
-Each year, `fireSense` spreads fires from the pixels where fires escaped, using `SpaDES.tools::spread2()` with the per-pixel spread probabilities in `fireSense_SpreadPredicted`.
-Ignitions and escapes are not simulated here: they come from `fireSense_IgnitionPredict` as `ignitionsAndEscapes`.
+Each year, `fireSense_burn` spreads fires from the pixels where fires escaped, using `SpaDES.tools::spread2()` with the per-pixel spread probabilities in `fireSense_SpreadPredicted`.
+Ignitions and escapes are not simulated here: they come from `fireSense_ignitionPredict` as `ignitionsAndEscapes`.
 The module records the pixels burned that year, a cumulative burn map, and a per-fire summary of area burned.
 
 ### Module inputs and parameters
 
-Table \@ref(tab:moduleInputs-fireSense) shows the full list of module inputs.
+Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module inputs.
 
 <table class="table" style="margin-left: auto; margin-right: auto;">
-<caption>(\#tab:moduleInputs-fireSense)(\#tab:moduleInputs-fireSense)List of (ref:fireSense) input objects and their description.</caption>
+<caption>(\#tab:moduleInputs-fireSense_burn)(\#tab:moduleInputs-fireSense_burn)List of (ref:fireSense_burn) input objects and their description.</caption>
  <thead>
   <tr>
    <th style="text-align:left;"> objectName </th>
@@ -67,7 +67,7 @@ Table \@ref(tab:moduleInputs-fireSense) shows the full list of module inputs.
   <tr>
    <td style="text-align:left;"> fireSense_SpreadSD </td>
    <td style="text-align:left;"> SpatRaster&amp;#124;numeric </td>
-   <td style="text-align:left;"> Sd of the per-year random effect on logit spread probability, as fitted by fireSense_SpreadFit (`yearSpreadSD`): a raster aligned with `fireSense_SpreadPredicted` (from fireSense_SpreadPredict, per ELF) or one number. Each year draws one z ~ N(0, 1); all of that year's fires spread with plogis(qlogis(p) + z sd). NULL or 0: no effect. </td>
+   <td style="text-align:left;"> Sd of the per-year random effect on logit spread probability, as fitted by fireSense_spreadFit (`yearSpreadSD`): a raster aligned with `fireSense_SpreadPredicted` (from fireSense_spreadPredict, per ELF) or one number. Each year draws one z ~ N(0, 1); all of that year's fires spread with plogis(qlogis(p) + z sd). NULL or 0: no effect. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
@@ -79,7 +79,7 @@ Table \@ref(tab:moduleInputs-fireSense) shows the full list of module inputs.
   <tr>
    <td style="text-align:left;"> ignitionsAndEscapes </td>
    <td style="text-align:left;"> data.table </td>
-   <td style="text-align:left;"> One row per ignition, with `pixelID` and `escaped` (logical), as fireSense_IgnitionPredict (&gt;= 1.0.0.9003) makes it. Each escaped ignition is one fire. </td>
+   <td style="text-align:left;"> One row per ignition, with `pixelID` and `escaped` (logical), as fireSense_ignitionPredict (&gt;= 1.0.0.9003) makes it. Each escaped ignition is one fire. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
@@ -97,11 +97,11 @@ Table \@ref(tab:moduleInputs-fireSense) shows the full list of module inputs.
 </tbody>
 </table>
 
-Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense))
+Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn))
 
 
 <table class="table" style="margin-left: auto; margin-right: auto;">
-<caption>(\#tab:moduleParams-fireSense)(\#tab:moduleParams-fireSense)List of (ref:fireSense) parameters and their description.</caption>
+<caption>(\#tab:moduleParams-fireSense_burn)(\#tab:moduleParams-fireSense_burn)List of (ref:fireSense_burn) parameters and their description.</caption>
  <thead>
   <tr>
    <th style="text-align:left;"> paramName </th>
@@ -167,7 +167,7 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense))
    <td style="text-align:left;"> 20 </td>
    <td style="text-align:left;"> 0 </td>
    <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> Passed to `SpaDES.tools::spreadCpp()` for escaped fires: attempts to jump for a fire still under `escapeSizeHa` that has nowhere left to spread. Default 20, as fireSense_SpreadFit fits with; 0 is off. </td>
+   <td style="text-align:left;"> Passed to `SpaDES.tools::spreadCpp()` for escaped fires: attempts to jump for a fire still under `escapeSizeHa` that has nowhere left to spread. Default 20, as fireSense_spreadFit fits with; 0 is off. </td>
   </tr>
   <tr>
    <td style="text-align:left;"> jumpMeanDist </td>
@@ -183,7 +183,7 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense))
    <td style="text-align:left;"> fireSens.... </td>
    <td style="text-align:left;"> NA </td>
    <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> Fires spread only if this includes `fireSense_SpreadPredict`. Other values are ignored. </td>
+   <td style="text-align:left;"> Fires spread only if this includes `fireSense_spreadPredict`. Other values are ignored. </td>
   </tr>
 </tbody>
 </table>
@@ -192,7 +192,7 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense))
 
 - `init`: creates `burnMap` (0 where flammable, `NA` elsewhere) and schedules the first `burn` at `.runInitialTime`.
 - `burn`: spreads fires from every pixel with `escapes > 0`, updates the outputs, and reschedules itself every `.runInterval` years.
-  Nothing burns in a year with no escapes, or if `whichModulesToPrepare` does not include `fireSense_SpreadPredict`.
+  Nothing burns in a year with no escapes, or if `whichModulesToPrepare` does not include `fireSense_spreadPredict`.
 
 ### Plotting
 
@@ -204,10 +204,10 @@ The module saves nothing itself; use the `outputs` argument of `simInit()`.
 
 ### Module outputs
 
-Description of the module outputs (Table \@ref(tab:moduleOutputs-fireSense)).
+Description of the module outputs (Table \@ref(tab:moduleOutputs-fireSense_burn)).
 
 <table class="table" style="margin-left: auto; margin-right: auto;">
-<caption>(\#tab:moduleOutputs-fireSense)(\#tab:moduleOutputs-fireSense)List of (ref:fireSense) outputs and their description.</caption>
+<caption>(\#tab:moduleOutputs-fireSense_burn)(\#tab:moduleOutputs-fireSense_burn)List of (ref:fireSense_burn) outputs and their description.</caption>
  <thead>
   <tr>
    <th style="text-align:left;"> objectName </th>
@@ -246,17 +246,17 @@ Description of the module outputs (Table \@ref(tab:moduleOutputs-fireSense)).
 
 ### Usage
 
-`fireSense` needs the objects made by the predict modules, so run it with them:
+`fireSense_burn` needs the objects made by the predict modules, so run it with them:
 
 
 ``` r
 library(SpaDES.core)
 
-modules <- list("fireSense_dataPrepPredict", "fireSense_IgnitionPredict",
-                "fireSense_SpreadPredict", "fireSense")
+modules <- list("fireSense_dataPrepPredict", "fireSense_ignitionPredict",
+                "fireSense_spreadPredict", "fireSense_burn")
 
 mySim <- simInit(times = list(start = 2011, end = 2100),
-                 params = list(fireSense = list(.plots = "png", .plotInterval = 10)),
+                 params = list(fireSense_burn = list(.plots = "png", .plotInterval = 10)),
                  modules = modules,
                  objects = objects, ## fitted fireSense models, rasterToMatch, flammableRTM, etc.
                  paths = list(modulePath = ".."))
@@ -265,13 +265,13 @@ spades(mySim)
 
 ### Links to other modules
 
-- `fireSense_IgnitionPredict` supplies `ignitionsAndEscapes`.
-- `fireSense_SpreadPredict` supplies `fireSense_SpreadPredicted`.
+- `fireSense_ignitionPredict` supplies `ignitionsAndEscapes`.
+- `fireSense_spreadPredict` supplies `fireSense_SpreadPredicted`.
 - Vegetation modules (e.g. `Biomass_regeneration`) use `rstCurrentBurn`.
 
 ### Getting help
 
-- <https://github.com/PredictiveEcology/fireSense/issues>
+- <https://github.com/PredictiveEcology/fireSense_burn/issues>
 
 ## References
 

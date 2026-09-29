@@ -1,4 +1,6 @@
-# fireSense (development version)
+# fireSense_burn 2.1.0
+
+- Renamed from `fireSense` to `fireSense_burn` (module naming convention `<model>_<camelCaseComponent>`); projects must rename the module and its `params` key. `loadOrder` and the `whichModulesToPrepare` default now name `fireSense_ignitionPredict` and `fireSense_spreadPredict` (renamed from `fireSense_IgnitionPredict` and `fireSense_SpreadPredict`); a project that sets `whichModulesToPrepare` must use the new names. The default no longer lists `fireSense_EscapePredict`, a module that no longer exists (fireSense_ignitionPredict predicts escapes).
 
 - New parameter `.studyAreaName` (default `NA`), the name PredictiveEcology modules use for the study area. This module does not use it yet.
 - `rstCurrentBurn` and `rstAnnualBurnID` now start empty in every burn event. In a year with no fire (no
@@ -39,7 +41,7 @@
 
 # fireSense 2.0.2
 
-First release from `development` since `master` was last updated (2022-02-17). Full history: https://github.com/PredictiveEcology/fireSense/compare/504f990...v2.0.2
+First release from `development` since `master` was last updated (2022-02-17). Full history: https://github.com/PredictiveEcology/fireSense_burn/compare/504f990...v2.0.2
 
 ## Breaking changes
 

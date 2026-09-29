@@ -1,4 +1,4 @@
-## Toy inputs for the fireSense tests. Nothing is downloaded and nothing needs a
+## Toy inputs for the fireSense_burn tests. Nothing is downloaded and nothing needs a
 ## package outside the module's `reqdPkgs`.
 ##
 ## The landscape is 10 x 10 pixels of 250 m, so one pixel is 250 * 250 / 1e4 = 6.25 ha.

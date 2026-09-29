@@ -1,6 +1,6 @@
 ---
-title: "fireSense Manual"
-subtitle: "v.`r SpaDES.core::moduleMetadata(module = 'fireSense', path = '..')$version`"
+title: "fireSense_burn Manual"
+subtitle: "v.`r SpaDES.core::moduleMetadata(module = 'fireSense_burn', path = '..')$version`"
 date: "Last updated: `r Sys.Date()`"
 output:
   bookdown::html_document2:
@@ -12,17 +12,17 @@ output:
     keep_md: yes
 editor_options:
   chunk_output_type: console
-  bibliography: citations/references_fireSense.bib
+  bibliography: citations/references_fireSense_burn.bib
 link-citations: true
 always_allow_html: true
 ---
 
-# fireSense Module
+# fireSense_burn Module
 
 <!-- the following are text references used in captions for LaTeX compatibility -->
-(ref:fireSense) *fireSense*
+(ref:fireSense_burn) *fireSense_burn*
 
-```{r setup-fireSense, include=FALSE}
+```{r setup-fireSense_burn, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, eval = FALSE, results = "hold") ## change to eval = TRUE if all chunks are to be evaluated
 
 dir.create("figures", showWarnings = FALSE)
@@ -38,7 +38,7 @@ download.file(url = "https://img.shields.io/badge/Made%20with-Markdown-1f425f.pn
 
 #### Authors:
 
-`r paste(as.character(SpaDES.core::moduleMetadata(module = "fireSense", path = '..')$authors), sep = ', ')`
+`r paste(as.character(SpaDES.core::moduleMetadata(module = "fireSense_burn", path = '..')$authors), sep = ', ')`
 <!-- ideally separate authors with new lines, '\n' not working -->
 
 ## Module Overview
@@ -47,27 +47,27 @@ A landscape fire model sensitive to environmental changes (e.g., weather and lan
 
 ### Module summary
 
-Each year, `fireSense` spreads fires from the pixels where fires escaped, using `SpaDES.tools::spread2()` with the per-pixel spread probabilities in `fireSense_SpreadPredicted`.
-Ignitions and escapes are not simulated here: they come from `fireSense_IgnitionPredict` as `ignitionsAndEscapes`.
+Each year, `fireSense_burn` spreads fires from the pixels where fires escaped, using `SpaDES.tools::spread2()` with the per-pixel spread probabilities in `fireSense_SpreadPredicted`.
+Ignitions and escapes are not simulated here: they come from `fireSense_ignitionPredict` as `ignitionsAndEscapes`.
 The module records the pixels burned that year, a cumulative burn map, and a per-fire summary of area burned.
 
 ### Module inputs and parameters
 
-Table \@ref(tab:moduleInputs-fireSense) shows the full list of module inputs.
+Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module inputs.
 
-```{r moduleInputs-fireSense, echo = FALSE, eval = TRUE, message = FALSE, warning = FALSE}
-df_inputs <- SpaDES.core::moduleInputs("fireSense", "..")
+```{r moduleInputs-fireSense_burn, echo = FALSE, eval = TRUE, message = FALSE, warning = FALSE}
+df_inputs <- SpaDES.core::moduleInputs("fireSense_burn", "..")
 knitr::kable(df_inputs,
-             caption = "List of (ref:fireSense) input objects and their description.") |>
+             caption = "List of (ref:fireSense_burn) input objects and their description.") |>
   kableExtra::kable_styling(latex_options = "scale_down", full_width = TRUE)
 ```
 
-Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense))
+Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn))
 
 
-```{r moduleParams-fireSense, echo = FALSE, eval = TRUE, message = FALSE, warning = FALSE}
-df_params <- SpaDES.core::moduleParams("fireSense", "..")
-knitr::kable(df_params, caption = "List of (ref:fireSense) parameters and their description.") |>
+```{r moduleParams-fireSense_burn, echo = FALSE, eval = TRUE, message = FALSE, warning = FALSE}
+df_params <- SpaDES.core::moduleParams("fireSense_burn", "..")
+knitr::kable(df_params, caption = "List of (ref:fireSense_burn) parameters and their description.") |>
   kableExtra::kable_styling(latex_options = "scale_down", full_width = TRUE)
 ```
 
@@ -75,7 +75,7 @@ knitr::kable(df_params, caption = "List of (ref:fireSense) parameters and their 
 
 - `init`: creates `burnMap` (0 where flammable, `NA` elsewhere) and schedules the first `burn` at `.runInitialTime`.
 - `burn`: spreads fires from every pixel with `escapes > 0`, updates the outputs, and reschedules itself every `.runInterval` years.
-  Nothing burns in a year with no escapes, or if `whichModulesToPrepare` does not include `fireSense_SpreadPredict`.
+  Nothing burns in a year with no escapes, or if `whichModulesToPrepare` does not include `fireSense_spreadPredict`.
 
 ### Plotting
 
@@ -87,26 +87,26 @@ The module saves nothing itself; use the `outputs` argument of `simInit()`.
 
 ### Module outputs
 
-Description of the module outputs (Table \@ref(tab:moduleOutputs-fireSense)).
+Description of the module outputs (Table \@ref(tab:moduleOutputs-fireSense_burn)).
 
-```{r moduleOutputs-fireSense, echo = FALSE, eval = TRUE, message = FALSE, warning = FALSE}
-df_outputs <- SpaDES.core::moduleOutputs("fireSense", "..")
-knitr::kable(df_outputs, caption = "List of (ref:fireSense) outputs and their description.") |>
+```{r moduleOutputs-fireSense_burn, echo = FALSE, eval = TRUE, message = FALSE, warning = FALSE}
+df_outputs <- SpaDES.core::moduleOutputs("fireSense_burn", "..")
+knitr::kable(df_outputs, caption = "List of (ref:fireSense_burn) outputs and their description.") |>
   kableExtra::kable_styling(latex_options = "scale_down", full_width = TRUE)
 ```
 
 ### Usage
 
-`fireSense` needs the objects made by the predict modules, so run it with them:
+`fireSense_burn` needs the objects made by the predict modules, so run it with them:
 
 ```{r module usage example, eval = FALSE}
 library(SpaDES.core)
 
-modules <- list("fireSense_dataPrepPredict", "fireSense_IgnitionPredict",
-                "fireSense_SpreadPredict", "fireSense")
+modules <- list("fireSense_dataPrepPredict", "fireSense_ignitionPredict",
+                "fireSense_spreadPredict", "fireSense_burn")
 
 mySim <- simInit(times = list(start = 2011, end = 2100),
-                 params = list(fireSense = list(.plots = "png", .plotInterval = 10)),
+                 params = list(fireSense_burn = list(.plots = "png", .plotInterval = 10)),
                  modules = modules,
                  objects = objects, ## fitted fireSense models, rasterToMatch, flammableRTM, etc.
                  paths = list(modulePath = ".."))
@@ -115,13 +115,13 @@ spades(mySim)
 
 ### Links to other modules
 
-- `fireSense_IgnitionPredict` supplies `ignitionsAndEscapes`.
-- `fireSense_SpreadPredict` supplies `fireSense_SpreadPredicted`.
+- `fireSense_ignitionPredict` supplies `ignitionsAndEscapes`.
+- `fireSense_spreadPredict` supplies `fireSense_SpreadPredicted`.
 - Vegetation modules (e.g. `Biomass_regeneration`) use `rstCurrentBurn`.
 
 ### Getting help
 
-- <https://github.com/PredictiveEcology/fireSense/issues>
+- <https://github.com/PredictiveEcology/fireSense_burn/issues>
 
 ## References
 
