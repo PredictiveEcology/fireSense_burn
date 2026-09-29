@@ -1,15 +1,15 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>/404.html</loc></url>
 <url><loc>/LICENSE-text.html</loc></url>
-<url><loc>/articles/fireSense.html</loc></url>
-<url><loc>/articles/fireSense_files/jqueryui-1.13.2/index.html</loc></url>
+<url><loc>/articles/fireSense_burn.html</loc></url>
+<url><loc>/articles/fireSense_burn_files/jqueryui-1.13.2/index.html</loc></url>
 <url><loc>/articles/index.html</loc></url>
 <url><loc>/authors.html</loc></url>
-<url><loc>/fireSense.html</loc></url>
+<url><loc>/fireSense_burn.html</loc></url>
 <url><loc>/index.html</loc></url>
 <url><loc>/news/index.html</loc></url>
 <url><loc>/reference/burn.html</loc></url>
-<url><loc>/reference/doEvent.fireSense.html</loc></url>
+<url><loc>/reference/doEvent.fireSense_burn.html</loc></url>
 <url><loc>/reference/index.html</loc></url>
 <url><loc>/reference/smallFires.html</loc></url>
 <url><loc>/reference/yearSpreadProb.html</loc></url>

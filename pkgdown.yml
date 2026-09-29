@@ -2,5 +2,5 @@ pandoc: 3.8.3
 pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
-  fireSense: fireSense.html
-last_built: 2026-09-29T17:24Z
+  fireSense_burn: fireSense_burn.html
+last_built: 2026-09-29T19:15Z
