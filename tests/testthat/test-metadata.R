@@ -64,7 +64,7 @@ test_that("parameter defaults are unchanged", {
   expect_identical(p$jumpTries, 20L)
   expect_identical(p$jumpMeanDist, 3)
   expect_identical(p$whichModulesToPrepare,
-                   c("fireSense_spreadPredict", "fireSense_ignitionPredict", "fireSense_EscapePredict"))
+                   c("fireSense_spreadPredict", "fireSense_ignitionPredict"))
 })
 
 test_that("every parameter, input and output has a description", {

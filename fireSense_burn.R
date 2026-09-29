@@ -43,7 +43,7 @@ defineModule(sim, list(
     defineParameter("jumpMeanDist", "numeric", 3, 0, NA,
                     "Passed to `SpaDES.tools::spreadCpp()`: mean jump distance, in cells."),
     defineParameter("whichModulesToPrepare", "character",
-                    default = c("fireSense_spreadPredict", "fireSense_ignitionPredict", "fireSense_EscapePredict"),
+                    default = c("fireSense_spreadPredict", "fireSense_ignitionPredict"),
                     NA, NA,
                     "Fires spread only if this includes `fireSense_spreadPredict`. Other values are ignored.")
   ),
