@@ -26,5 +26,5 @@ jobs:
       contents: write
     uses: PredictiveEcology/actions/.github/workflows/pkgdown-module.yaml@main
     with:
-      module: fireSense
+      module: fireSense_burn
 

@@ -1,7 +1,7 @@
 # Everything in this file gets sourced during simInit, and all functions and objects
 # are put into the simList. To use objects and functions, use sim$xxx.
 defineModule(sim, list(
-  name = "fireSense",
+  name = "fireSense_burn",
   description = "A landscape fire model, sensitive to environmental changes (e.g.
                  weather and land-cover).",
   keywords = c("fire", "percolation", "environmental control", "feedback",
@@ -12,15 +12,15 @@ defineModule(sim, list(
     person(c("Alex", "M."), "Chubaty", email = "achubaty@for-cast.ca", role = "ctb")
   ),
   childModules = character(),
-  version = numeric_version("2.0.2.9005"),
+  version = numeric_version("2.1.0"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
-  documentation = list("README.md", "fireSense.Rmd"), ## same file
+  documentation = list("README.md", "fireSense_burn.Rmd"), ## same file
   reqdPkgs = list("data.table", "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9044)",
                   "ggplot2", "ggspatial", "PredictiveEcology/SpaDES.tools@development (>= 2.1.3.9009)",
                   "terra"),
-  loadOrder = list(after = c("fireSense_IgnitionPredict", "fireSense_SpreadPredict")),
+  loadOrder = list(after = c("fireSense_ignitionPredict", "fireSense_spreadPredict")),
   parameters = rbind(
     defineParameter(".plots", "character|logical", default = NULL, ## TODO: use .plotInitialTime etc.
                     desc = "Passed to `types` in `Plots()`, e.g. \"screen\", \"png\". `NULL` or `NA` for no plots."),
@@ -38,27 +38,27 @@ defineModule(sim, list(
                           "`NA` spreads escaped fires from their ignition pixel only.")),
     defineParameter("jumpTries", "integer", 20L, 0L, NA,
                     paste("Passed to `SpaDES.tools::spreadCpp()` for escaped fires: attempts to jump for a fire",
-                          "still under `escapeSizeHa` that has nowhere left to spread. Default 20, as fireSense_SpreadFit fits",
+                          "still under `escapeSizeHa` that has nowhere left to spread. Default 20, as fireSense_spreadFit fits",
                           "with; 0 is off.")),
     defineParameter("jumpMeanDist", "numeric", 3, 0, NA,
                     "Passed to `SpaDES.tools::spreadCpp()`: mean jump distance, in cells."),
     defineParameter("whichModulesToPrepare", "character",
-                    default = c("fireSense_SpreadPredict", "fireSense_IgnitionPredict", "fireSense_EscapePredict"),
+                    default = c("fireSense_spreadPredict", "fireSense_ignitionPredict", "fireSense_EscapePredict"),
                     NA, NA,
-                    "Fires spread only if this includes `fireSense_SpreadPredict`. Other values are ignored.")
+                    "Fires spread only if this includes `fireSense_spreadPredict`. Other values are ignored.")
   ),
   inputObjects = rbind(
     expectsInput("fireSense_SpreadPredicted", "SpatRaster",
                  "Per-pixel spread probability for the current year."),
     expectsInput("fireSense_SpreadSD", "SpatRaster|numeric",
                  paste("Sd of the per-year random effect on logit spread probability, as fitted by",
-                       "fireSense_SpreadFit (`yearSpreadSD`): a raster aligned with `fireSense_SpreadPredicted`",
-                       "(from fireSense_SpreadPredict, per ELF) or one number. Each year draws one z ~ N(0, 1);",
+                       "fireSense_spreadFit (`yearSpreadSD`): a raster aligned with `fireSense_SpreadPredicted`",
+                       "(from fireSense_spreadPredict, per ELF) or one number. Each year draws one z ~ N(0, 1);",
                        "all of that year's fires spread with plogis(qlogis(p) + z * sd). NULL or 0: no effect.")),
     expectsInput("flammableRTM", "SpatRaster", 
                  "Binary SpatRaster (1 = flammable, 0 = not). Non-flammable pixels are `NA` in `burnMap`."),
     expectsInput("ignitionsAndEscapes", "data.table",
-                 paste("One row per ignition, with `pixelID` and `escaped` (logical), as fireSense_IgnitionPredict",
+                 paste("One row per ignition, with `pixelID` and `escaped` (logical), as fireSense_ignitionPredict",
                        "(>= 1.0.0.9003) makes it. Each escaped ignition is one fire.")),
     expectsInput("nonEscapedFireSizesHa", "numeric",
                  paste("Sizes (ha) of the study area's observed fires below `escapeSizeHa`, from",
@@ -93,7 +93,7 @@ defineModule(sim, list(
 #' @param debug Unused.
 #'
 #' @return The `simList`, invisibly.
-doEvent.fireSense = function(sim, eventTime, eventType, debug = FALSE) {
+doEvent.fireSense_burn = function(sim, eventTime, eventType, debug = FALSE) {
   moduleName <- current(sim)$moduleName
 
   switch(
@@ -150,11 +150,11 @@ burn <- function(sim) {
   sim$rstAnnualBurnID <- rast(tmpl)
 
   ig <- sim$ignitionsAndEscapes
-  if (NROW(ig) == 0L || !"fireSense_SpreadPredict" %in% P(sim)$whichModulesToPrepare)
+  if (NROW(ig) == 0L || !"fireSense_spreadPredict" %in% P(sim)$whichModulesToPrepare)
     return(invisible(sim))
   if (!"escaped" %in% names(ig))
     stop("ignitionsAndEscapes needs the column `escaped`, which ignitions escaped ",
-         "(fireSense_IgnitionPredict >= 1.0.0.9003). Its `escapes` is a coarse pixel's count, repeated ",
+         "(fireSense_ignitionPredict >= 1.0.0.9003). Its `escapes` is a coarse pixel's count, repeated ",
          "on each of that pixel's ignitions, so it cannot say which fires to spread.")
 
   ## this year's spread probability, with the year's random effect if the fit has one

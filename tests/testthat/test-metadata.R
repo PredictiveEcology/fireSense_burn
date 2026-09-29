@@ -7,7 +7,7 @@
 md <- SpaDES.core::moduleMetadata(module = moduleName, path = modulePath)
 
 test_that("module metadata parses and names the module", {
-  expect_identical(md$name, "fireSense")
+  expect_identical(md$name, "fireSense_burn")
   expect_identical(md$timeunit, "year")
   expect_identical(md$childModules, character())
 })
@@ -55,7 +55,7 @@ test_that("parameter defaults are unchanged", {
   ## a simInit with no params gives the defaults; `.runInitialTime` defaults to start(sim)
   sim <- runFireSense(data.table::data.table(pixelID = 1L, escapes = 0L, escaped = FALSE),
                       times = list(start = 7, end = 7), doSpades = FALSE)
-  p <- SpaDES.core::params(sim)$fireSense
+  p <- SpaDES.core::params(sim)$fireSense_burn
   expect_null(p$.plots)
   expect_identical(p$.plotInterval, 10)
   expect_identical(as.numeric(p$.runInitialTime), 7)
@@ -64,7 +64,7 @@ test_that("parameter defaults are unchanged", {
   expect_identical(p$jumpTries, 20L)
   expect_identical(p$jumpMeanDist, 3)
   expect_identical(p$whichModulesToPrepare,
-                   c("fireSense_SpreadPredict", "fireSense_IgnitionPredict", "fireSense_EscapePredict"))
+                   c("fireSense_spreadPredict", "fireSense_ignitionPredict", "fireSense_EscapePredict"))
 })
 
 test_that("every parameter, input and output has a description", {

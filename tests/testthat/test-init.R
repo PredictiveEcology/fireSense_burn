@@ -20,9 +20,9 @@ test_that("init schedules the first burn at .runInitialTime with priority 5.13",
   sim <- runFireSense(noFire, times = list(start = 1, end = 10),
                       params = list(.runInitialTime = 4), doSpades = FALSE)
   sim <- suppressMessages(SpaDES.core::spades(sim, debug = FALSE,
-                                              events = list(fireSense = "init")))
+                                              events = list(fireSense_burn = "init")))
   ev <- SpaDES.core::events(sim)
-  ev <- ev[ev$moduleName == "fireSense", ]
+  ev <- ev[ev$moduleName == "fireSense_burn", ]
   expect_identical(nrow(ev), 1L)
   expect_identical(ev$eventType, "burn")
   expect_identical(as.numeric(ev$eventTime), 4)

@@ -2,7 +2,7 @@
 ## deterministic -- a fire burns its whole block and nothing else -- so every expected
 ## value below is derived by hand from the toy landscape in helper-toy.R.
 
-## one row per ignition; `escaped` says whether it escaped (fireSense_IgnitionPredict >= 1.0.0.9003)
+## one row per ignition; `escaped` says whether it escaped (fireSense_ignitionPredict >= 1.0.0.9003)
 ig <- function(pixelID, escapes) data.table::data.table(pixelID = pixelID, escapes = escapes, escaped = escapes > 0)
 
 test_that("one escaped fire burns exactly its own block", {
@@ -82,9 +82,9 @@ test_that("an empty or all-NA ignitions table burns nothing", {
   expect_null(allNA$burnSummary)
 })
 
-test_that("nothing spreads unless whichModulesToPrepare includes fireSense_SpreadPredict", {
+test_that("nothing spreads unless whichModulesToPrepare includes fireSense_spreadPredict", {
   sim <- runFireSense(ig(1L, 1L),
-                      params = list(whichModulesToPrepare = "fireSense_IgnitionPredict"))
+                      params = list(whichModulesToPrepare = "fireSense_ignitionPredict"))
   expect_null(sim$burnSummary)
   expect_identical(sum(vals(sim$burnMap), na.rm = TRUE), 0)
 })
