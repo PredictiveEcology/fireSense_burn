@@ -244,3 +244,18 @@ test_that("a year without fire leaves no burn in rstCurrentBurn or rstAnnualBurn
     expect_identical(vals(sim$burnMap), burnMap1, label = paste(nm, "burnMap unchanged by a no-fire year"))
   }
 })
+
+test_that("a year whose ignitions do not escape burns only its own small fires, not last year's", {
+  ## 6.25 ha = 1 pixel exactly, so the ignition that did not escape burns its own pixel only
+  sim <- runFireSense(ig(1L, 1L), objects = list(nonEscapedFireSizesHa = 6.25))
+  expect_identical(which(vals(sim$rstCurrentBurn) == 1), westCells())
+  sim$ignitionsAndEscapes <- ig(10L, 0L) # east block, did not escape
+  SpaDES.core::end(sim) <- 2
+  grDevices::pdf(NULL)
+  sim <- suppressMessages(SpaDES.core::spades(sim, debug = FALSE))
+  grDevices::dev.off()
+  expect_identical(which(vals(sim$rstCurrentBurn) == 1), 10L)
+  expect_identical(which(!is.na(vals(sim$rstAnnualBurnID))), 10L)
+  expect_identical(vals(sim$burnMap)[c(westCells(), 10L)], rep(1, 41)) # year 1's block, year 2's pixel
+  expect_identical(sim$burnSummary[year == 2]$igLoc, 10L)
+})
