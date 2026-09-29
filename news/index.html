@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">fireSense_burn</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.1.0.9000</span>
       </span>
     </div>
 
@@ -51,6 +51,10 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="2.1.0.9000" id="firesense_burn-2109000">fireSense_burn 2.1.0.9000<a class="anchor" aria-label="anchor" href="#firesense_burn-2109000"></a></h2>
+<ul><li>License: GPL-3.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="2.1.0" id="firesense_burn-210">fireSense_burn 2.1.0<a class="anchor" aria-label="anchor" href="#firesense_burn-210"></a></h2>
 <ul><li><p>Renamed from <code>fireSense</code> to <code>fireSense_burn</code> (module naming convention <code>&lt;model&gt;_&lt;camelCaseComponent&gt;</code>); projects must rename the module and its <code>params</code> key. <code>loadOrder</code> and the <code>whichModulesToPrepare</code> default now name <code>fireSense_ignitionPredict</code> and <code>fireSense_spreadPredict</code> (renamed from <code>fireSense_IgnitionPredict</code> and <code>fireSense_SpreadPredict</code>); a project that sets <code>whichModulesToPrepare</code> must use the new names. The default no longer lists <code>fireSense_EscapePredict</code>, a module that no longer exists (fireSense_ignitionPredict predicts escapes).</p></li>
