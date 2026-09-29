@@ -1,3 +1,7 @@
+# fireSense_burn 2.1.0.9000
+
+- License: GPL-3.
+
 # fireSense_burn 2.1.0
 
 - Renamed from `fireSense` to `fireSense_burn` (module naming convention `<model>_<camelCaseComponent>`); projects must rename the module and its `params` key. `loadOrder` and the `whichModulesToPrepare` default now name `fireSense_ignitionPredict` and `fireSense_spreadPredict` (renamed from `fireSense_IgnitionPredict` and `fireSense_SpreadPredict`); a project that sets `whichModulesToPrepare` must use the new names. The default no longer lists `fireSense_EscapePredict`, a module that no longer exists (fireSense_ignitionPredict predicts escapes).
