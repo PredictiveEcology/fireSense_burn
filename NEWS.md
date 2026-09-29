@@ -41,7 +41,7 @@
 
 # fireSense 2.0.2
 
-First release from `development` since `master` was last updated (2022-02-17). Full history: https://github.com/PredictiveEcology/fireSense/compare/504f990...v2.0.2
+First release from `development` since `master` was last updated (2022-02-17). Full history: https://github.com/PredictiveEcology/fireSense_burn/compare/504f990...v2.0.2
 
 ## Breaking changes
 

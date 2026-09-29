@@ -271,7 +271,7 @@ spades(mySim)
 
 ### Getting help
 
-- <https://github.com/PredictiveEcology/fireSense/issues>
+- <https://github.com/PredictiveEcology/fireSense_burn/issues>
 
 ## References
 
