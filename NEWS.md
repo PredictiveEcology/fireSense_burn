@@ -1,4 +1,8 @@
-# fireSense_burn 2.1.0.9000
+# fireSense_burn 2.2.0
+
+This release makes the fire simulation behave the way the fitted models assume. Fires now spread with the same method used when fitting, each escaped ignition becomes exactly one fire, and ignitions that do not escape burn a small, realistic area instead of none. Year-to-year variation in fire spread, estimated during fitting, is applied each year. The burn maps start empty every year, so a year without fire no longer shows the previous year's fires.
+
+The module was renamed from `fireSense` to `fireSense_burn`, since `fireSense` is now the parent module for the whole family; projects need to use the new name. Unused settings were removed, and the module is now licensed under GPL-3.
 
 - License: GPL-3.
 
