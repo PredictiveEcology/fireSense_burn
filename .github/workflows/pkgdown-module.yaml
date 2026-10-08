@@ -1,0 +1,30 @@
+## Thin caller: build this module's pkgdown site and publish it with GitHub Pages.
+## The job lives in PredictiveEcology/actions, so its setup and pins move once:
+## https://github.com/PredictiveEcology/actions/blob/main/.github/workflows/pkgdown-module.yaml
+## Background: PredictiveEcology/SpaDES-modules#40.
+##
+## Publishes from `development` (the pilot's choice; which branch should publish
+## is an open question on #40). Pull requests build the site without deploying.
+## The site is at https://predictiveecology.github.io/fireSense_burn/ until a
+## custom domain is set with the `url` input.
+
+name: pkgdown-module
+
+on:
+  push:
+    branches: [development]
+  pull_request:
+    branches: [development]
+  workflow_dispatch:
+
+jobs:
+  pkgdown-module:
+    ## The called workflow's deploy job pushes to gh-pages. A called workflow can
+    ## only reduce what the caller grants, never widen it, so the write scope has
+    ## to be granted here.
+    permissions:
+      contents: write
+    uses: PredictiveEcology/actions/.github/workflows/pkgdown-module.yaml@main
+    with:
+      module: fireSense_burn
+
