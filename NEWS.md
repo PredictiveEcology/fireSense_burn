@@ -1,5 +1,7 @@
 # fireSense_burn (development version)
 
+- `rstCurrentBurn` and `rstAnnualBurnID` are now all-`NA` rasters in a year without fire, not grids with no cell values, so `terra::writeRaster()` can save them (`emptyBurnRaster()`).
+
 # fireSense_burn 2.2.0
 
 This release makes the fire simulation behave the way the fitted models assume. Fires now spread with the same method used when fitting, each escaped ignition becomes exactly one fire, and ignitions that do not escape burn a small, realistic area instead of none. Year-to-year variation in fire spread, estimated during fitting, is applied each year. The burn maps start empty every year, so a year without fire no longer shows the previous year's fires.

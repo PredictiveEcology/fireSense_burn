@@ -67,9 +67,11 @@ test_that("no escapes at all leaves every output as init made it", {
   sim <- runFireSense(ig(c(1L, 10L), c(0L, 0L)))
   expect_null(sim$burnSummary)
   expect_null(sim$burnDT)
-  ## this year's burn rasters exist and are empty (geometry only), so nothing reads a previous year's burn
-  expect_false(terra::hasValues(sim$rstAnnualBurnID))
-  expect_false(terra::hasValues(sim$rstCurrentBurn))
+  ## this year's burn rasters exist and are empty (all NA), so nothing reads a previous year's burn
+  for (r in list(sim$rstAnnualBurnID, sim$rstCurrentBurn)) {
+    expect_true(terra::hasValues(r))
+    expect_true(all(is.na(vals(r))))
+  }
   expect_identical(sum(vals(sim$burnMap), na.rm = TRUE), 0)
 })
 
@@ -222,6 +224,17 @@ test_that("the year effect changes how much burns, and all fires in a year share
   expect_gt(stats::var(colSums(withEffect)), stats::var(colSums(noEffect)))
   ## the two fires of a year move together: their sizes correlate across years
   expect_gt(stats::cor(withEffect[1, ], withEffect[2, ]), 0.5)
+})
+
+## fireSense_summary writes rstAnnualBurnID every year of a hindcast; terra::writeRaster() stops with
+## "[writeRaster] there are no cell values" on a raster without values.
+test_that("a year without fire gives burn rasters that can be written", {
+  for (ign in list(ig(integer(0), integer(0)), ig(1L, 0L))) {
+    sim <- runFireSense(ign)
+    f <- withr::local_tempfile(fileext = ".tif")
+    expect_no_error(terra::writeRaster(sim$rstAnnualBurnID, f))
+    expect_true(terra::hasValues(terra::rast(f)))
+  }
 })
 
 ## rstCurrentBurn is this year's burn: CBM_dataPrep reads it every year as disturbance events
