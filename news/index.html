@@ -53,7 +53,9 @@
 
     <div class="section level2">
 <h2 class="page-header" data-toc-text="development version" id="firesense_burn-development-version">fireSense_burn (development version)<a class="anchor" aria-label="anchor" href="#firesense_burn-development-version"></a></h2>
-</div>
+<ul><li>
+<code>rstCurrentBurn</code> and <code>rstAnnualBurnID</code> are now all-<code>NA</code> rasters in a year without fire, not grids with no cell values, so <code><a href="https://rspatial.github.io/terra/reference/writeRaster.html" class="external-link">terra::writeRaster()</a></code> can save them (<code><a href="../reference/emptyBurnRaster.html">emptyBurnRaster()</a></code>).</li>
+</ul></div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="2.2.0" id="firesense_burn-220">fireSense_burn 2.2.0<a class="anchor" aria-label="anchor" href="#firesense_burn-220"></a></h2>
 <p>This release makes the fire simulation behave the way the fitted models assume. Fires now spread with the same method used when fitting, each escaped ignition becomes exactly one fire, and ignitions that do not escape burn a small, realistic area instead of none. Year-to-year variation in fire spread, estimated during fitting, is applied each year. The burn maps start empty every year, so a year without fire no longer shows the previous year’s fires.</p>
