@@ -1,5 +1,6 @@
 # fireSense_burn (development version)
 
+- `SpaDES.core` is now in `reqdPkgs` (`scheduleEvent()`, `P()`, `Plots()` are used).
 - `rstCurrentBurn` and `rstAnnualBurnID` are now all-`NA` rasters in a year without fire, not grids with no cell values, so `terra::writeRaster()` can save them (`emptyBurnRaster()`).
 
 # fireSense_burn 2.2.0
