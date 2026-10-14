@@ -106,7 +106,7 @@ doEvent.fireSense_burn = function(sim, eventTime, eventType, debug = FALSE) {
 
       ## trying to avoid the raster warning no non-missing arguments to max
       sim$burnMap <- rast(sim$rasterToMatch)
-      sim$rstCurrentBurn <- rast(sim$rasterToMatch)
+      sim$rstCurrentBurn <- emptyBurnRaster(sim$rasterToMatch)
       
       burnVals <- as.vector(sim$flammableRTM)
       sim$burnMap[burnVals == 0] <- NA
@@ -130,6 +130,16 @@ doEvent.fireSense_burn = function(sim, eventTime, eventType, debug = FALSE) {
   invisible(sim)
 }
 
+#' An empty burn raster
+#'
+#' A raster on the grid of `template` with every pixel `NA`. It has cell values, unlike `rast(template)`,
+#' so `terra::writeRaster()` accepts it in a year without fire.
+#'
+#' @param template A `SpatRaster`.
+#'
+#' @return A `SpatRaster`.
+emptyBurnRaster <- function(template) rast(template, vals = NA)
+
 #' Spread this year's escaped fires
 #'
 #' Spreads fires with `SpaDES.tools::spreadCpp()` from every pixel in
@@ -146,8 +156,8 @@ burn <- function(sim) {
   ## without fire must not keep last year's pixels. CBM_dataPrep reads `rstCurrentBurn` every year as
   ## disturbance events, so a stale raster would burn the same pixels again.
   tmpl <- if (!is.null(sim$fireSense_SpreadPredicted)) sim$fireSense_SpreadPredicted else sim$rasterToMatch
-  sim$rstCurrentBurn <- rast(tmpl)
-  sim$rstAnnualBurnID <- rast(tmpl)
+  sim$rstCurrentBurn <- emptyBurnRaster(tmpl)
+  sim$rstAnnualBurnID <- emptyBurnRaster(tmpl)
 
   ig <- sim$ignitionsAndEscapes
   if (NROW(ig) == 0L || !"fireSense_spreadPredict" %in% P(sim)$whichModulesToPrepare)

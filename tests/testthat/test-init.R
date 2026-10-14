@@ -10,9 +10,10 @@ test_that("init makes burnMap 0 where flammable and NA on the barrier", {
   expect_true(terra::compareGeom(sim$burnMap, sim$rasterToMatch))
 })
 
-test_that("init makes an empty rstCurrentBurn on the rasterToMatch grid", {
+test_that("init makes an empty (all NA) rstCurrentBurn on the rasterToMatch grid", {
   sim <- runFireSense(noFire, params = list(.runInitialTime = 99))
-  expect_false(terra::hasValues(sim$rstCurrentBurn)) # rast(rasterToMatch): geometry only
+  expect_true(terra::hasValues(sim$rstCurrentBurn))
+  expect_true(all(is.na(vals(sim$rstCurrentBurn))))
   expect_true(terra::compareGeom(sim$rstCurrentBurn, sim$rasterToMatch))
 })
 
