@@ -72,3 +72,7 @@ runFireSense <- function(ignitions, times = list(start = 1, end = 1), params = l
 }
 
 vals <- function(r) as.vector(terra::values(r))
+
+## `postProcess()` is called by the module (coarseToFineMap()); in a project `reproducible` is attached
+## from the module's reqdPkgs.
+suppressPackageStartupMessages(library(reproducible))

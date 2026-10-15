@@ -19,8 +19,8 @@ defineModule(sim, list(
   documentation = list("README.md", "fireSense_burn.Rmd"), ## same file
   reqdPkgs = list("data.table", "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
                   "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9044)",
-                  "ggplot2", "ggspatial", "PredictiveEcology/SpaDES.tools@development (>= 2.1.3.9009)",
-                  "terra"),
+                  "ggplot2", "ggspatial", "PredictiveEcology/reproducible@development",
+                  "PredictiveEcology/SpaDES.tools@development (>= 2.1.3.9009)", "terra"),
   loadOrder = list(after = c("fireSense_ignitionPredict", "fireSense_spreadPredict")),
   parameters = rbind(
     defineParameter(".plots", "character|logical", default = NULL, ## TODO: use .plotInitialTime etc.
@@ -58,9 +58,15 @@ defineModule(sim, list(
                        "all of that year's fires spread with plogis(qlogis(p) + z * sd). NULL or 0: no effect.")),
     expectsInput("flammableRTM", "SpatRaster", 
                  "Binary SpatRaster (1 = flammable, 0 = not). Non-flammable pixels are `NA` in `burnMap`."),
-    expectsInput("ignitionsAndEscapes", "data.table",
-                 paste("One row per ignition, with `pixelID` and `escaped` (logical), as fireSense_ignitionPredict",
-                       "(>= 1.0.0.9003) makes it. Each escaped ignition is one fire.")),
+    expectsInput("fireSense_IgAndEscapeProbRas", "SpatRaster",
+                 paste("Two layers at the resolution of `ignitionFitRTM`, from fireSense_ignitionPredict:",
+                       "`ignitionProb`, the expected ignitions per pixel and year, and `escapeProb`, the expected",
+                       "escapes per pixel and year given an ignition. Ignitions and escapes are drawn from these each year.")),
+    expectsInput("fireSense_IgAndEscapeDistribution", "list",
+                 paste("`list(ignition = , escape = )`, from fireSense_ignitionPredict: the objective the ignition and",
+                       "escape models were fitted with. Only `\"count:poisson\"` can be drawn from.")),
+    expectsInput("ignitionFitRTM", "SpatRaster",
+                 "The coarse raster the ignition and escape models were fitted on (from fireSense_dataPrepFit)."),
     expectsInput("nonEscapedFireSizesHa", "numeric",
                  paste("Sizes (ha) of the study area's observed fires below `escapeSizeHa`, from",
                        "fireSense_dataPrepFit. Each ignition that did not escape burns a patch of a size drawn",
@@ -69,6 +75,12 @@ defineModule(sim, list(
                  "Template raster for the study area, ideally buffered to limit fire edge effects.")
   ),
   outputObjects = rbind(
+    createsOutput("ignitionsAndEscapes", "data.table",
+                  paste("This year's ignitions, one row per ignited pixel, in random order: `pixelID` (cell index of",
+                        "`flammableRTM`), `igProb`, `ignitions`, `escapeProb`, `escapes` of the coarse pixel it was drawn",
+                        "from, and `escaped`, whether this ignition escaped: exactly `escapes` of a coarse pixel's rows",
+                        "are TRUE. Drawn each year from `fireSense_IgAndEscapeProbRas`; without that raster a supplied",
+                        "`ignitionsAndEscapes` is used as it is.")),
     createsOutput("burnDT", "data.table",
                   paste("The most recent fire year's burned pixels: `initialPixels` (the fire's ignition pixel),",
                         "`pixels`, and `fire_id`.")),
@@ -141,9 +153,9 @@ doEvent.fireSense_burn = function(sim, eventTime, eventType, debug = FALSE) {
 #' @return A `SpatRaster`.
 emptyBurnRaster <- function(template) rast(template, vals = NA)
 
-#' Spread this year's escaped fires
+#' Draw this year's ignitions and escapes, then spread this year's escaped fires
 #'
-#' Spreads fires with `SpaDES.tools::spreadCpp()` from every pixel in
+#' Draws the ignitions and escapes (`drawIgnitionsAndEscapes()`), then spreads fires with `SpaDES.tools::spreadCpp()` from every pixel in
 #' `sim$ignitionsAndEscapes` with `escapes > 0`, then updates the burn outputs.
 #' Does nothing if there are no escapes.
 #'
@@ -159,6 +171,11 @@ burn <- function(sim) {
   tmpl <- if (!is.null(sim$fireSense_SpreadPredicted)) sim$fireSense_SpreadPredicted else sim$rasterToMatch
   sim$rstCurrentBurn <- emptyBurnRaster(tmpl)
   sim$rstAnnualBurnID <- emptyBurnRaster(tmpl)
+
+  ## Every random draw of ignitions and escapes is made here, from the surfaces fireSense_ignitionPredict
+  ## predicts. Without the surface, a supplied `ignitionsAndEscapes` is spread as it is.
+  if (!is.null(sim$fireSense_IgAndEscapeProbRas))
+    sim$ignitionsAndEscapes <- drawIgnitionsAndEscapes(sim, store = mod)
 
   ig <- sim$ignitionsAndEscapes
   if (NROW(ig) == 0L || !"fireSense_spreadPredict" %in% P(sim)$whichModulesToPrepare)
@@ -217,6 +234,75 @@ burn <- function(sim) {
   invisible(sim)
 }
 
+#' Draw a count from its fitted distribution
+#'
+#' The only family drawn from is the Poisson (`"count:poisson"`, as both the ignition and the escape models
+#' are fitted). Another objective, e.g. `"reg:tweedie"`, would need a dispersion the fit does not pass on.
+#'
+#' @param objective The model objective, from `fireSense_IgAndEscapeDistribution`.
+#' @param mean Numeric vector of expected counts; `NA` is 0.
+#' @param what `"ignition"` or `"escape"`, for the error message.
+#'
+#' @return An integer vector of counts, one per `mean`.
+drawCounts <- function(objective, mean, what) {
+  mean[is.na(mean)] <- 0
+  switch(objective,
+         "count:poisson" = stats::rpois(length(mean), lambda = mean),
+         stop("fireSense_burn: cannot draw ", what, "s from objective '", objective, "'; only 'count:poisson' is supported"))
+}
+
+#' Draw this year's ignitions and escapes
+#'
+#' Draws ignitions per coarse pixel from `fireSense_IgAndEscapeDistribution$ignition` with mean `ignitionProb`;
+#' for coarse pixels with ignitions, draws escapes from `$escape` with mean `escapeProb`, at most one per ignition.
+#' Each ignition is placed in a random flammable `flammableRTM` pixel inside its coarse pixel, and
+#' which of a coarse pixel's ignitions escaped is drawn: exactly `escapes` of them.
+#'
+#' @param sim A `simList`.
+#' @param store An environment to keep the coarse-to-fine mapping in (the module's `mod`).
+#'
+#' @return A `data.table`, one row per ignition, in random order: `pixelID`, `igProb`, `ignitions`,
+#'   `escapeProb`, `escapes`, `escaped`.
+drawIgnitionsAndEscapes <- function(sim, store) {
+  dist <- sim$fireSense_IgAndEscapeDistribution
+  if (is.null(dist$ignition) || is.null(dist$escape))
+    stop("fireSense_burn: fireSense_IgAndEscapeProbRas needs fireSense_IgAndEscapeDistribution ",
+         "(list(ignition = , escape = )) to say how to draw from it")
+  ## one row per coarse pixel with an expected ignition count (the others are non-flammable or have no covariates)
+  coarse <- data.table(pixelID = seq_len(terra::ncell(sim$fireSense_IgAndEscapeProbRas)),
+                       igProb = terra::values(sim$fireSense_IgAndEscapeProbRas[["ignitionProb"]], mat = FALSE),
+                       escapeProb = terra::values(sim$fireSense_IgAndEscapeProbRas[["escapeProb"]], mat = FALSE))
+  coarse <- coarse[!is.na(coarse$igProb), ]
+  igns <- drawCounts(dist$ignition, coarse$igProb, "ignition")
+  whHasIgns <- which(igns > 0)
+  ## no more escapes than ignitions
+  escs <- pmin(drawCounts(dist$escape, coarse$escapeProb[whHasIgns], "escape"), igns[whHasIgns])
+  set(coarse, NULL, c("ignitions", "escapes"), list(igns, NA_integer_))
+  set(coarse, whHasIgns, "escapes", escs)
+
+  ## accounting for spatial resolution of models: ignitions are drawn on the smaller pixels of flammableRTM
+  ## The fine-to-coarse cell mapping does not change within a run, so it is computed once (in `store`).
+  igRasDT <- fineCoarseTable(coarseToFineMap(sim$ignitionFitRTM, sim$flammableRTM, store = store),
+                             sim$flammableRTM)
+  # nomatch = NULL --> removes pixels that aren't in `coarse`, which are non flammable
+  igs <- igRasDT[coarse, on = c("chunkyPixels" = "pixelID"), nomatch = NULL]
+  # use unique because of multiple pixelID per chunkyPixel
+  drawTable <- unique(igs[ignitions > 0, .(chunkyPixels, ignitions, escapes)])
+  pixelID_igs <- placeIgnitions(igs, drawTable)
+
+  ## `escapes` counts the coarse pixel's escapes and is repeated on each of its ignitions, so which of
+  ## them escaped is drawn here: exactly `escapes` of the coarse pixel's rows. Drawn after every pixel
+  ## is placed, so the placements do not change.
+  if (NROW(pixelID_igs)) {
+    pixelID_igs[, escaped := seq_len(.N) %in% sample.int(.N, min(escapes[1], .N)), by = "chunkyPixels"]
+  } else {
+    set(pixelID_igs, NULL, "escaped", logical(0))
+  }
+  set(pixelID_igs, NULL, "chunkyPixels", NULL)
+  randomOrder <- sample.int(nrow(pixelID_igs)) # sample(1:0) would give 2 rows
+  pixelID_igs[randomOrder, ] #Randomize order
+}
+
 #' Small fires for the ignitions that did not escape
 #'
 #' Each ignition gets a size drawn from `sizesHa` (the observed fires below `escapeSizeHa`), turned into
@@ -263,4 +349,75 @@ yearSpreadProb <- function(spreadProbRas, sd) {
   if (!any(s > 0)) return(p)
   z <- stats::rnorm(1)
   stats::plogis(stats::qlogis(p) + z * s)
+}
+
+#' Which coarse cell each fine cell falls in
+#'
+#' Regridding the coarse ignition raster onto `flammableRTM` ("near", because the cells may not be
+#' round multiples) took about 3 s a year at 6.7M cells, and the mapping never changes within a run.
+#' It is computed once, from the coarse cell numbers, and kept in `store`; it is rebuilt if the extent,
+#' dimensions or crs of either raster change.
+#'
+#' @param coarse,fine `SpatRaster`s: `ignitionFitRTM` and `flammableRTM`.
+#' @param store An environment to keep the mapping in (the module's `mod`).
+#'
+#' @return A vector with one element per fine cell: its coarse cell number, `NA` outside the coarse raster.
+coarseToFineMap <- function(coarse, fine, store) {
+  gridKey <- function(r) list(as.vector(terra::ext(r)), dim(r), terra::crs(r))
+  key <- list(gridKey(coarse), gridKey(fine))
+  if (!is.null(store$coarseToFine) && identical(store$coarseToFine$key, key))
+    return(store$coarseToFine$map)
+
+  coarseIds <- rast(coarse)
+  coarseIds[] <- seq_len(ncell(coarseIds))
+  coarseIds <- postProcess(coarseIds, to = fine, method = "near")
+  map <- as.vector(terra::values(coarseIds, mat = FALSE))
+  store$coarseToFine <- list(key = key, map = map)
+  map
+}
+
+#' The fine cells and their coarse cells, for one year
+#'
+#' @param map The result of `coarseToFineMap()`.
+#' @param fine `flammableRTM`: cells not equal to 1 are left out.
+#'
+#' @return A `data.table` with `pixelID` (fine cell) and `chunkyPixels` (coarse cell).
+fineCoarseTable <- function(map, fine) {
+  flam <- fine[]
+  keep <- which(!is.na(map) & !(!is.na(flam) & flam != 1))
+  data.table(pixelID = keep, chunkyPixels = map[keep])
+}
+
+#' Place each coarse pixel's ignitions on its fine pixels
+#'
+#' For each row of `drawTable`, draws `ignitions` of the fine pixels of that coarse pixel and returns
+#' their rows of `igs`, in `igs` row order. One `split()` of the candidate rows and a pixelID-to-row
+#' lookup replace a scan of all of `igs` for every ignited coarse pixel.
+#'
+#' The `sample()` calls are made in `drawTable` order, on the candidate `pixelID`s in `igs` order. This
+#' includes the `sample(x, size)` behaviour for a single candidate `x`, which draws from `1:x`; the
+#' pixels with those IDs are then returned, wherever they are. That quirk is kept so results do not change.
+#'
+#' @param igs `data.table` of fine pixels with `pixelID`, `igProb`, `ignitions`, `escapeProb`, `escapes`
+#'   and `chunkyPixels` (the coarse pixel).
+#' @param drawTable `data.table` with one row per ignited coarse pixel: `chunkyPixels`, `ignitions`.
+#'
+#' @return A `data.table` with the `igs` columns `pixelID`, `igProb`, `ignitions`, `escapeProb`,
+#'   `escapes`, `chunkyPixels`, for the drawn pixels.
+placeIgnitions <- function(igs, drawTable) {
+  sel <- which(igs$chunkyPixels %in% drawTable$chunkyPixels)
+  rowsByChunk <- split(sel, igs$chunkyPixels[sel])
+  rowOfPixel <- integer(max(igs$pixelID, 0L))
+  rowOfPixel[igs$pixelID] <- seq_len(nrow(igs))
+  cols <- c("pixelID", "igProb", "ignitions", "escapeProb", "escapes", "chunkyPixels")
+  out <- vector("list", nrow(drawTable))
+  for (i in seq_len(nrow(drawTable))) {
+    rows <- rowsByChunk[[as.character(drawTable$chunkyPixels[i])]]
+    drawn <- sample(igs$pixelID[rows], size = drawTable$ignitions[i])
+    hit <- rowOfPixel[drawn[drawn >= 1 & drawn <= length(rowOfPixel)]]
+    out[[i]] <- igs[sort(hit[hit > 0]), ..cols]
+  }
+  ## no ignited coarse pixel: rbindlist(list()) has no columns, so keep the schema of a normal year
+  if (!length(out)) return(igs[integer(0), ..cols])
+  rbindlist(out)
 }
