@@ -48,7 +48,7 @@ A landscape fire model sensitive to environmental changes (e.g., weather and lan
 ### Module summary
 
 Each year, `fireSense_burn` spreads fires from the pixels where fires escaped, using `SpaDES.tools::spread2()` with the per-pixel spread probabilities in `fireSense_SpreadPredicted`.
-Ignitions and escapes are not simulated here: they come from `fireSense_ignitionPredict` as `ignitionsAndEscapes`.
+Ignitions and escapes are drawn here, each year, from the expected counts `fireSense_ignitionPredict` predicts (`fireSense_IgAndEscapeProbRas`), using the objective of the fitted models (`fireSense_IgAndEscapeDistribution`, only `count:poisson`); escapes are capped at the ignitions. The result is `ignitionsAndEscapes`.
 The module records the pixels burned that year, a cumulative burn map, and a per-fire summary of area burned.
 
 ### Module inputs and parameters
@@ -74,7 +74,7 @@ knitr::kable(df_params, caption = "List of (ref:fireSense_burn) parameters and t
 ### Events
 
 - `init`: creates `burnMap` (0 where flammable, `NA` elsewhere) and schedules the first `burn` at `.runInitialTime`.
-- `burn`: spreads fires from every pixel with `escapes > 0`, updates the outputs, and reschedules itself every `.runInterval` years.
+- `burn`: draws the year's ignitions and escapes, then spreads fires from every pixel with `escaped`, updates the outputs, and reschedules itself every `.runInterval` years.
   Nothing burns in a year with no escapes, or if `whichModulesToPrepare` does not include `fireSense_spreadPredict`.
 
 ### Plotting
@@ -115,7 +115,7 @@ spades(mySim)
 
 ### Links to other modules
 
-- `fireSense_ignitionPredict` supplies `ignitionsAndEscapes`.
+- `fireSense_ignitionPredict` supplies `fireSense_IgAndEscapeProbRas` and `fireSense_IgAndEscapeDistribution`.
 - `fireSense_spreadPredict` supplies `fireSense_SpreadPredicted`.
 - Vegetation modules (e.g. `Biomass_regeneration`) use `rstCurrentBurn`.
 

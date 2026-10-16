@@ -16,12 +16,14 @@ test_that("inputs are the expected names and classes", {
   inputs <- stats::setNames(md$inputObjects$objectClass, md$inputObjects$objectName)
   expect_identical(
     inputs[order(names(inputs))],
-    c(fireSense_SpreadPredicted = "SpatRaster",
-      fireSense_SpreadSD        = "SpatRaster|numeric",
-      flammableRTM              = "SpatRaster",
-      ignitionsAndEscapes       = "data.table",
-      nonEscapedFireSizesHa     = "numeric",
-      rasterToMatch             = "SpatRaster")
+    c(fireSense_IgAndEscapeDistribution = "list",
+      fireSense_IgAndEscapeProbRas      = "SpatRaster",
+      fireSense_SpreadPredicted         = "SpatRaster",
+      fireSense_SpreadSD                = "SpatRaster|numeric",
+      flammableRTM                      = "SpatRaster",
+      ignitionFitRTM                    = "SpatRaster",
+      nonEscapedFireSizesHa             = "numeric",
+      rasterToMatch                     = "SpatRaster")
   )
 })
 
@@ -32,6 +34,7 @@ test_that("outputs are the expected names and classes", {
     c(burnDT          = "data.table",
       burnMap         = "SpatRaster",
       burnSummary     = "data.table",
+      ignitionsAndEscapes = "data.table",
       rstAnnualBurnID = "SpatRaster",
       rstCurrentBurn  = "SpatRaster")
   )
@@ -76,7 +79,7 @@ test_that("every parameter, input and output has a description", {
 
 test_that("required packages are unchanged", {
   expect_setequal(unlist(md$reqdPkgs), c("data.table", "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9044)",
-                                         "ggplot2", "ggspatial",
+                                         "ggplot2", "ggspatial", "PredictiveEcology/reproducible@development",
                                          "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
                                          "PredictiveEcology/SpaDES.tools@development (>= 2.1.3.9009)", "terra"))
 })

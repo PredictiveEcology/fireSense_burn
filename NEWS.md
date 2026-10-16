@@ -1,5 +1,9 @@
 # fireSense_burn (development version)
 
+- Breaking: `burn` now draws the ignitions and escapes (it makes `ignitionsAndEscapes`) from `fireSense_IgAndEscapeProbRas` and `fireSense_IgAndEscapeDistribution`, made by `fireSense_ignitionPredict` (>= its PR 33). `placeIgnitions()`, `coarseToFineMap()` and `fineCoarseTable()` moved here from that module. New inputs: those two and `ignitionFitRTM`; `reproducible` is in `reqdPkgs`.
+- Ignitions are Poisson draws with mean `ignitionProb`, escapes Poisson with mean `escapeProb`, capped at the ignitions (was `rbinom(ignitions, min(mean, 1))`); other objectives stop. A seed no longer reproduces earlier runs.
+- Without `fireSense_IgAndEscapeProbRas`, a supplied `ignitionsAndEscapes` is spread as it is.
+
 - `SpaDES.core` is now in `reqdPkgs` (`scheduleEvent()`, `P()`, `Plots()` are used).
 - `rstCurrentBurn` and `rstAnnualBurnID` are now all-`NA` rasters in a year without fire, not grids with no cell values, so `terra::writeRaster()` can save them (`emptyBurnRaster()`).
 
