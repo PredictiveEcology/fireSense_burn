@@ -1,5 +1,6 @@
 # fireSense_burn (development version)
 
+- `drawCounts()` takes the objective it can draw from, `"count:poisson"`, from `fireSenseUtils::ignitionObjectiveTxt` (the objective the ignition and escape models are fitted with) instead of its own copy; same behaviour. Needs fireSenseUtils (>= 0.2.3.9104).
 - Breaking: `burn` now draws the ignitions and escapes (it makes `ignitionsAndEscapes`) from `fireSense_IgAndEscapeProbRas` and `fireSense_IgAndEscapeDistribution`, made by `fireSense_ignitionPredict` (>= its PR 33). `placeIgnitions()`, `coarseToFineMap()` and `fineCoarseTable()` moved here from that module. New inputs: those two and `ignitionFitRTM`; `reproducible` is in `reqdPkgs`.
 - Ignitions are Poisson draws with mean `ignitionProb`, escapes Poisson with mean `escapeProb`, capped at the ignitions (was `rbinom(ignitions, min(mean, 1))`); other objectives stop. A seed no longer reproduces earlier runs.
 - Without `fireSense_IgAndEscapeProbRas`, a supplied `ignitionsAndEscapes` is spread as it is.

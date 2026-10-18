@@ -18,7 +18,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_burn.Rmd"), ## same file
   reqdPkgs = list("data.table", "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
-                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9044)",
+                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9104)",
                   "ggplot2", "ggspatial", "PredictiveEcology/reproducible@development",
                   "PredictiveEcology/SpaDES.tools@development (>= 2.1.3.9009)", "terra"),
   loadOrder = list(after = c("fireSense_ignitionPredict", "fireSense_spreadPredict")),
@@ -246,9 +246,10 @@ burn <- function(sim) {
 #' @return An integer vector of counts, one per `mean`.
 drawCounts <- function(objective, mean, what) {
   mean[is.na(mean)] <- 0
-  switch(objective,
-         "count:poisson" = stats::rpois(length(mean), lambda = mean),
-         stop("fireSense_burn: cannot draw ", what, "s from objective '", objective, "'; only 'count:poisson' is supported"))
+  if (!identical(objective, fireSenseUtils::ignitionObjectiveTxt))
+    stop("fireSense_burn: cannot draw ", what, "s from objective '", objective, "'; only '",
+         fireSenseUtils::ignitionObjectiveTxt, "' is supported")
+  stats::rpois(length(mean), lambda = mean)
 }
 
 #' Draw this year's ignitions and escapes
