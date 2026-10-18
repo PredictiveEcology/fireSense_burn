@@ -135,3 +135,9 @@ test_that("a burn event with a surface but an unsupported objective stops", {
                                       ignitionFitRTM = toyCoarseRTM())),
     "reg:tweedie")
 })
+
+test_that("the objective drawn from is fireSenseUtils::ignitionObjectiveTxt, not a copy", {
+  testthat::local_mocked_bindings(ignitionObjectiveTxt = "reg:tweedie", .package = "fireSenseUtils")
+  expect_length(drawCounts("reg:tweedie", c(1, 2), "ignition"), 2)
+  expect_error(drawCounts("count:poisson", c(1, 2), "ignition"), "only 'reg:tweedie' is supported")
+})
