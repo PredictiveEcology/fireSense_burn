@@ -1,7 +1,7 @@
 ---
 title: "fireSense_burn Manual"
 subtitle: "v.0.0.0.9000"
-date: "Last updated: 2026-10-14"
+date: "Last updated: 2026-10-19"
 output:
   bookdown::html_document2:
     toc: true
@@ -42,7 +42,7 @@ A landscape fire model sensitive to environmental changes (e.g., weather and lan
 ### Module summary
 
 Each year, `fireSense_burn` spreads fires from the pixels where fires escaped, using `SpaDES.tools::spread2()` with the per-pixel spread probabilities in `fireSense_SpreadPredicted`.
-Ignitions and escapes are not simulated here: they come from `fireSense_ignitionPredict` as `ignitionsAndEscapes`.
+Ignitions and escapes are drawn here, each year, from the expected counts `fireSense_ignitionPredict` predicts (`fireSense_IgAndEscapeProbRas`), using the objective of the fitted models (`fireSense_IgAndEscapeDistribution`, only `count:poisson`); escapes are capped at the ignitions. The result is `ignitionsAndEscapes`.
 The module records the pixels burned that year, a cumulative burn map, and a per-fire summary of area burned.
 
 ### Module inputs and parameters
@@ -69,7 +69,13 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
   <tr>
    <td style="text-align:left;"> fireSense_SpreadSD </td>
    <td style="text-align:left;"> SpatRaster&amp;#124;numeric </td>
-   <td style="text-align:left;"> Sd of the per-year random effect on logit spread probability, as fitted by fireSense_spreadFit (`yearSpreadSD`): a raster aligned with `fireSense_SpreadPredicted` (from fireSense_spreadPredict, per ELF) or one number. Each year draws one z ~ N(0, 1); all of that year's fires spread with plogis(qlogis(p) + z sd). NULL or 0: no effect. </td>
+   <td style="text-align:left;"> Sd of the per-year random effect (on logit spread probability; on x with `fireSense_SpreadPowerLaw`), as fitted by fireSense_spreadFit (`yearSpreadSD`): a raster aligned with `fireSense_SpreadPredicted` (from fireSense_spreadPredict, per ELF) or one number. Each year draws one z ~ N(0, 1); all of that year's fires spread with plogis(qlogis(p) + z sd). NULL or 0: no effect. </td>
+   <td style="text-align:left;"> NA </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> fireSense_SpreadPowerLaw </td>
+   <td style="text-align:left;"> SpatRaster&amp;#124;numeric </td>
+   <td style="text-align:left;"> From fireSense_spreadPredict, only for a fit made with `spreadLink = "powerLaw"`: `pc`, `gamma` and `floor` of `fireSenseUtils::powerLawLink()`, as a numeric vector with these names (one ELF) or a 3-layer raster aligned with `fireSense_SpreadPredicted`. The year effect is then added to the linear predictor x, as in the fit: p = powerLawLink(x + z sd), with x recovered from p. NULL: the effect is added on the logit. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
@@ -79,9 +85,21 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> ignitionsAndEscapes </td>
-   <td style="text-align:left;"> data.table </td>
-   <td style="text-align:left;"> One row per ignition, with `pixelID` and `escaped` (logical), as fireSense_ignitionPredict (&gt;= 1.0.0.9003) makes it. Each escaped ignition is one fire. </td>
+   <td style="text-align:left;"> fireSense_IgAndEscapeProbRas </td>
+   <td style="text-align:left;"> SpatRaster </td>
+   <td style="text-align:left;"> Two layers at the resolution of `ignitionFitRTM`, from fireSense_ignitionPredict: `ignitionProb`, the expected ignitions per pixel and year, and `escapeProb`, the expected escapes per pixel and year given an ignition. Ignitions and escapes are drawn from these each year. </td>
+   <td style="text-align:left;"> NA </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> fireSense_IgAndEscapeDistribution </td>
+   <td style="text-align:left;"> list </td>
+   <td style="text-align:left;"> `list(ignition = , escape = )`, from fireSense_ignitionPredict: the objective the ignition and escape models were fitted with. Only `"count:poisson"` can be drawn from. </td>
+   <td style="text-align:left;"> NA </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> ignitionFitRTM </td>
+   <td style="text-align:left;"> SpatRaster </td>
+   <td style="text-align:left;"> The coarse raster the ignition and escape models were fitted on (from fireSense_dataPrepFit). </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
@@ -193,7 +211,7 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn)
 ### Events
 
 - `init`: creates `burnMap` (0 where flammable, `NA` elsewhere) and schedules the first `burn` at `.runInitialTime`.
-- `burn`: spreads fires from every pixel with `escapes > 0`, updates the outputs, and reschedules itself every `.runInterval` years.
+- `burn`: draws the year's ignitions and escapes, then spreads fires from every pixel with `escaped`, updates the outputs, and reschedules itself every `.runInterval` years.
   Nothing burns in a year with no escapes, or if `whichModulesToPrepare` does not include `fireSense_spreadPredict`.
 
 ### Plotting
@@ -218,6 +236,11 @@ Description of the module outputs (Table \@ref(tab:moduleOutputs-fireSense_burn)
   </tr>
  </thead>
 <tbody>
+  <tr>
+   <td style="text-align:left;"> ignitionsAndEscapes </td>
+   <td style="text-align:left;"> data.table </td>
+   <td style="text-align:left;"> This year's ignitions, one row per ignited pixel, in random order: `pixelID` (cell index of `flammableRTM`), `igProb`, `ignitions`, `escapeProb`, `escapes` of the coarse pixel it was drawn from, and `escaped`, whether this ignition escaped: exactly `escapes` of a coarse pixel's rows are TRUE. Drawn each year from `fireSense_IgAndEscapeProbRas`; without that raster a supplied `ignitionsAndEscapes` is used as it is. </td>
+  </tr>
   <tr>
    <td style="text-align:left;"> burnDT </td>
    <td style="text-align:left;"> data.table </td>
@@ -267,7 +290,7 @@ spades(mySim)
 
 ### Links to other modules
 
-- `fireSense_ignitionPredict` supplies `ignitionsAndEscapes`.
+- `fireSense_ignitionPredict` supplies `fireSense_IgAndEscapeProbRas` and `fireSense_IgAndEscapeDistribution`.
 - `fireSense_spreadPredict` supplies `fireSense_SpreadPredicted`.
 - Vegetation modules (e.g. `Biomass_regeneration`) use `rstCurrentBurn`.
 

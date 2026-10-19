@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">fireSense_burn</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9002</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9004</span>
       </span>
     </div>
 
@@ -53,10 +53,13 @@
 
     <div class="section level2">
 <h2 class="page-header" data-toc-text="development version" id="firesense_burn-development-version">fireSense_burn (development version)<a class="anchor" aria-label="anchor" href="#firesense_burn-development-version"></a></h2>
-<ul><li>
-<code>SpaDES.core</code> is now in <code>reqdPkgs</code> (<code><a href="https://spades-core.predictiveecology.org/reference/scheduleEvent.html" class="external-link">scheduleEvent()</a></code>, <code><a href="https://spades-core.predictiveecology.org/reference/params.html" class="external-link">P()</a></code>, <code><a href="https://spades-core.predictiveecology.org/reference/Plots.html" class="external-link">Plots()</a></code> are used).</li>
-<li>
-<code>rstCurrentBurn</code> and <code>rstAnnualBurnID</code> are now all-<code>NA</code> rasters in a year without fire, not grids with no cell values, so <code><a href="https://rspatial.github.io/terra/reference/writeRaster.html" class="external-link">terra::writeRaster()</a></code> can save them (<code><a href="../reference/emptyBurnRaster.html">emptyBurnRaster()</a></code>).</li>
+<ul><li><p>A fit made with <code>fireSense_spreadFit</code>’s <code>spreadLink = "powerLaw"</code> adds its year effect to the linear predictor <code>x</code>, not to the logit of <code>p</code>; <code>burn</code> now does the same. New input <code>fireSense_SpreadPowerLaw</code> (from <code>fireSense_spreadPredict</code>: <code>pc</code>, <code>gamma</code>, <code>floor</code>) lets <code><a href="../reference/yearSpreadProb.html">yearSpreadProb()</a></code> recover <code>x</code> from <code>p</code>, add <code>z * sd</code>, and map back with <code><a href="https://rdrr.io/pkg/fireSenseUtils/man/powerLawLink.html" class="external-link">fireSenseUtils::powerLawLink()</a></code>. Without it (the ceiling and climateOutside links, every earlier run) the year effect is added on the logit exactly as before. Needs fireSenseUtils (&gt;= 0.2.3.9107) and fireSense_spreadPredict’s PR 31.</p></li>
+<li><p><code><a href="../reference/drawCounts.html">drawCounts()</a></code> takes the objective it can draw from, <code>"count:poisson"</code>, from <code><a href="https://rdrr.io/pkg/fireSenseUtils/man/fireSenseUtils-constants.html" class="external-link">fireSenseUtils::ignitionObjectiveTxt</a></code> (the objective the ignition and escape models are fitted with) instead of its own copy; same behaviour. Needs fireSenseUtils (&gt;= 0.2.3.9104).</p></li>
+<li><p>Breaking: <code>burn</code> now draws the ignitions and escapes (it makes <code>ignitionsAndEscapes</code>) from <code>fireSense_IgAndEscapeProbRas</code> and <code>fireSense_IgAndEscapeDistribution</code>, made by <code>fireSense_ignitionPredict</code> (&gt;= its PR 33). <code><a href="../reference/placeIgnitions.html">placeIgnitions()</a></code>, <code><a href="../reference/coarseToFineMap.html">coarseToFineMap()</a></code> and <code><a href="../reference/fineCoarseTable.html">fineCoarseTable()</a></code> moved here from that module. New inputs: those two and <code>ignitionFitRTM</code>; <code>reproducible</code> is in <code>reqdPkgs</code>.</p></li>
+<li><p>Ignitions are Poisson draws with mean <code>ignitionProb</code>, escapes Poisson with mean <code>escapeProb</code>, capped at the ignitions (was <code>rbinom(ignitions, min(mean, 1))</code>); other objectives stop. A seed no longer reproduces earlier runs.</p></li>
+<li><p>Without <code>fireSense_IgAndEscapeProbRas</code>, a supplied <code>ignitionsAndEscapes</code> is spread as it is.</p></li>
+<li><p><code>SpaDES.core</code> is now in <code>reqdPkgs</code> (<code><a href="https://spades-core.predictiveecology.org/reference/scheduleEvent.html" class="external-link">scheduleEvent()</a></code>, <code><a href="https://spades-core.predictiveecology.org/reference/params.html" class="external-link">P()</a></code>, <code><a href="https://spades-core.predictiveecology.org/reference/Plots.html" class="external-link">Plots()</a></code> are used).</p></li>
+<li><p><code>rstCurrentBurn</code> and <code>rstAnnualBurnID</code> are now all-<code>NA</code> rasters in a year without fire, not grids with no cell values, so <code><a href="https://rspatial.github.io/terra/reference/writeRaster.html" class="external-link">terra::writeRaster()</a></code> can save them (<code><a href="../reference/emptyBurnRaster.html">emptyBurnRaster()</a></code>).</p></li>
 </ul></div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="2.2.0" id="firesense_burn-220">fireSense_burn 2.2.0<a class="anchor" aria-label="anchor" href="#firesense_burn-220"></a></h2>
