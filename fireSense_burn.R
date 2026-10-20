@@ -18,7 +18,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_burn.Rmd"), ## same file
   reqdPkgs = list("data.table", "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
-                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9107)",
+                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9112)",
                   "ggplot2", "ggspatial", "PredictiveEcology/reproducible@development",
                   "PredictiveEcology/SpaDES.tools@development (>= 2.1.3.9009)", "terra"),
   loadOrder = list(after = c("fireSense_ignitionPredict", "fireSense_spreadPredict")),
@@ -54,7 +54,8 @@ defineModule(sim, list(
     expectsInput("fireSense_SpreadSD", "SpatRaster|numeric",
                  paste("Sd of the per-year random effect (on logit spread probability; on x with `fireSense_SpreadPowerLaw`), as fitted by",
                        "fireSense_spreadFit (`yearSpreadSD`): a raster aligned with `fireSense_SpreadPredicted`",
-                       "(from fireSense_spreadPredict, per ELF) or one number. Each year draws one z ~ N(0, 1);",
+                       "(from fireSense_spreadPredict, per ELF) or one number. Each year draws one z ~ N(0, 1), the",
+                       "same z that scales that year's ignitions and escapes (`fireSense_IgAndEscapeProbRas`);",
                        "all of that year's fires spread with plogis(qlogis(p) + z * sd). NULL or 0: no effect.")),
     expectsInput("fireSense_SpreadPowerLaw", "SpatRaster|numeric",
                  paste("From fireSense_spreadPredict, only for a fit made with `spreadLink = \"powerLaw\"`: `pc`, `gamma` and",
@@ -67,7 +68,10 @@ defineModule(sim, list(
     expectsInput("fireSense_IgAndEscapeProbRas", "SpatRaster",
                  paste("Two layers at the resolution of `ignitionFitRTM`, from fireSense_ignitionPredict:",
                        "`ignitionProb`, the expected ignitions per pixel and year, and `escapeProb`, the expected",
-                       "escapes per pixel and year given an ignition. Ignitions and escapes are drawn from these each year.")),
+                       "escapes per pixel and year given an ignition. Ignitions and escapes are drawn from these each year.",
+                       "Optional layers `ignitionYearSD` and `escapeYearSD`: the sd of the year effect of each; a year",
+                       "multiplies the means by exp(sd * z - sd^2 / 2), with the year's z shared with spread.",
+                       "Absent or 0: no year effect.")),
     expectsInput("fireSense_IgAndEscapeDistribution", "list",
                  paste("`list(ignition = , escape = )`, from fireSense_ignitionPredict: the objective the ignition and",
                        "escape models were fitted with. Only `\"count:poisson\"` can be drawn from.")),
@@ -161,7 +165,8 @@ emptyBurnRaster <- function(template) rast(template, vals = NA)
 
 #' Draw this year's ignitions and escapes, then spread this year's escaped fires
 #'
-#' Draws the ignitions and escapes (`drawIgnitionsAndEscapes()`), then spreads fires with `SpaDES.tools::spreadCpp()` from every pixel in
+#' Draws the year's z (`yearZ()`), shared by ignitions, escapes and spread, and the ignitions and escapes
+#' (`drawIgnitionsAndEscapes()`), then spreads fires with `SpaDES.tools::spreadCpp()` from every pixel in
 #' `sim$ignitionsAndEscapes` with `escapes > 0`, then updates the burn outputs.
 #' Does nothing if there are no escapes.
 #'
@@ -180,8 +185,12 @@ burn <- function(sim) {
 
   ## Every random draw of ignitions and escapes is made here, from the surfaces fireSense_ignitionPredict
   ## predicts. Without the surface, a supplied `ignitionsAndEscapes` is spread as it is.
+  ## The year's z, one per burn event, shared by ignitions, escapes and spread: a bad spread year is also a bad
+  ## ignition and escape year. NULL when the ignition and escape fits have no year effect; yearSpreadProb()
+  ## then draws it as it always has, so such runs keep their random stream.
+  z <- yearZ(sim$fireSense_IgAndEscapeProbRas)
   if (!is.null(sim$fireSense_IgAndEscapeProbRas))
-    sim$ignitionsAndEscapes <- drawIgnitionsAndEscapes(sim, store = mod)
+    sim$ignitionsAndEscapes <- drawIgnitionsAndEscapes(sim, store = mod, z = z)
 
   ig <- sim$ignitionsAndEscapes
   if (NROW(ig) == 0L || !"fireSense_spreadPredict" %in% P(sim)$whichModulesToPrepare)
@@ -192,7 +201,8 @@ burn <- function(sim) {
          "on each of that pixel's ignitions, so it cannot say which fires to spread.")
 
   ## this year's spread probability, with the year's random effect if the fit has one
-  spreadProbYear <- yearSpreadProb(sim$fireSense_SpreadPredicted, sim$fireSense_SpreadSD, sim$fireSense_SpreadPowerLaw)
+  spreadProbYear <- yearSpreadProb(sim$fireSense_SpreadPredicted, sim$fireSense_SpreadSD, sim$fireSense_SpreadPowerLaw,
+                                   z = z)
 
   ## One fire per escaped ignition, spread with spreadCpp(), the spread the fit uses (fireSenseUtils'
   ## objective), so a forecast spreads fires as the fitted parameters assume: an escaped fire burns its
@@ -262,15 +272,19 @@ drawCounts <- function(objective, mean, what) {
 #'
 #' Draws ignitions per coarse pixel from `fireSense_IgAndEscapeDistribution$ignition` with mean `ignitionProb`;
 #' for coarse pixels with ignitions, draws escapes from `$escape` with mean `escapeProb`, at most one per ignition.
+#' With `z`, both means are first multiplied by the year effect (`fireSenseUtils::yearEffectMultiplier()` with
+#' the `ignitionYearSD` and `escapeYearSD` layers), so a year with z > 0 has more ignitions, more escapes and,
+#' through `yearSpreadProb()`, more spread.
 #' Each ignition is placed in a random flammable `flammableRTM` pixel inside its coarse pixel, and
 #' which of a coarse pixel's ignitions escaped is drawn: exactly `escapes` of them.
 #'
 #' @param sim A `simList`.
 #' @param store An environment to keep the coarse-to-fine mapping in (the module's `mod`).
+#' @param z The year's z (`yearZ()`), or `NULL`: no year effect.
 #'
 #' @return A `data.table`, one row per ignition, in random order: `pixelID`, `igProb`, `ignitions`,
-#'   `escapeProb`, `escapes`, `escaped`.
-drawIgnitionsAndEscapes <- function(sim, store) {
+#'   `escapeProb`, `escapes`, `escaped`. `igProb` and `escapeProb` are the means drawn from, after the year effect.
+drawIgnitionsAndEscapes <- function(sim, store, z = NULL) {
   dist <- sim$fireSense_IgAndEscapeDistribution
   if (is.null(dist$ignition) || is.null(dist$escape))
     stop("fireSense_burn: fireSense_IgAndEscapeProbRas needs fireSense_IgAndEscapeDistribution ",
@@ -279,6 +293,13 @@ drawIgnitionsAndEscapes <- function(sim, store) {
   coarse <- data.table(pixelID = seq_len(terra::ncell(sim$fireSense_IgAndEscapeProbRas)),
                        igProb = terra::values(sim$fireSense_IgAndEscapeProbRas[["ignitionProb"]], mat = FALSE),
                        escapeProb = terra::values(sim$fireSense_IgAndEscapeProbRas[["escapeProb"]], mat = FALSE))
+  if (!is.null(z)) {
+    ## the year's multiplier has mean 1 over z, so the long-run means are kept and stay valid Poisson means
+    ras <- sim$fireSense_IgAndEscapeProbRas
+    set(coarse, NULL, c("igProb", "escapeProb"),
+        list(coarse$igProb * fireSenseUtils::yearEffectMultiplier(yearSDLayer(ras, "ignitionYearSD"), z),
+             coarse$escapeProb * fireSenseUtils::yearEffectMultiplier(yearSDLayer(ras, "escapeYearSD"), z)))
+  }
   coarse <- coarse[!is.na(coarse$igProb), ]
   igns <- drawCounts(dist$ignition, coarse$igProb, "ignition")
   whHasIgns <- which(igns > 0)
@@ -338,6 +359,30 @@ smallFires <- function(loci, sizesHa, landscape, spreadProb, burned = integer())
   data.table(initialPixels = ss$initialLocus, pixels = ss$indices)
 }
 
+#' The year's z, when the ignition or escape fits have a year effect
+#'
+#' One z ~ N(0, 1) per `burn` event, shared by the ignitions, the escapes and spread (`yearSpreadProb()`).
+#' It is drawn here only when `ignitionYearSD` or `escapeYearSD` is above 0 somewhere; otherwise `NULL`, and
+#' `yearSpreadProb()` draws it if spread has a year effect, as before, so the random stream does not change.
+#'
+#' @param probRas `fireSense_IgAndEscapeProbRas`, or `NULL`.
+#' @return One number, or `NULL`.
+yearZ <- function(probRas) {
+  if (is.null(probRas)) return(NULL)
+  sds <- intersect(c("ignitionYearSD", "escapeYearSD"), names(probRas))
+  if (length(sds) && any(terra::values(probRas[[sds]], mat = FALSE) > 0, na.rm = TRUE)) stats::rnorm(1)
+}
+
+#' One year-effect sd layer of `fireSense_IgAndEscapeProbRas`, as a vector; 0 where it is absent
+#'
+#' @param probRas `fireSense_IgAndEscapeProbRas`.
+#' @param layer `"ignitionYearSD"` or `"escapeYearSD"`.
+#' @return Numeric vector, one per cell.
+yearSDLayer <- function(probRas, layer) {
+  if (!layer %in% names(probRas)) return(rep(0, terra::ncell(probRas)))
+  terra::values(probRas[[layer]], mat = FALSE)
+}
+
 #' This year's spread probability, with the per-year random effect
 #'
 #' The fit (`fireSenseUtils::.objfunSpreadFit()` with `yearSpreadSD`) gives each year one eps, shared by all that
@@ -352,14 +397,15 @@ smallFires <- function(loci, sizesHa, landscape, spreadProb, burned = integer())
 #' @param sd `NULL`, one number, or a `SpatRaster` aligned with `spreadProbRas`.
 #' @param powerLaw `NULL` (logit), or `fireSense_SpreadPowerLaw`: a numeric vector or 3-layer `SpatRaster` with
 #'   `pc`, `gamma` and `floor`.
+#' @param z The year's z, shared with the ignitions and escapes (`yearZ()`); `NULL` draws one here.
 #' @return Numeric vector of spread probability, one per pixel.
-yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL) {
+yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL) {
   p <- terra::values(spreadProbRas, mat = FALSE)
   if (is.null(sd)) return(p)
   s <- if (inherits(sd, "SpatRaster")) terra::values(sd, mat = FALSE) else rep_len(sd, length(p))
   s[is.na(s)] <- 0
   if (!any(s > 0)) return(p)
-  z <- stats::rnorm(1)
+  if (is.null(z)) z <- stats::rnorm(1)
   if (is.null(powerLaw)) return(stats::plogis(stats::qlogis(p) + z * s))
 
   ## a parameter per pixel: a raster's layer, or one number for all

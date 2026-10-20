@@ -308,3 +308,24 @@ test_that("a year whose ignitions do not escape burns only its own small fires, 
   expect_identical(vals(sim$burnMap)[c(westCells(), 10L)], rep(1, 41)) # year 1's block, year 2's pixel
   expect_identical(sim$burnSummary[year == 2]$igLoc, 10L)
 })
+
+test_that("one z per year: years with many escaped fires are also years with large fires", {
+  ## the 2 x 2 coarse grid of test-draw.R: 2 expected ignitions and 1 expected escape per coarse pixel, sd 0.8 each
+  ## (a coarse pixel has 20-25 flammable fine pixels to place its ignitions on, so the means stay small)
+  coarse <- terra::rast(nrows = 2, ncols = 2, xmin = 0, xmax = 2500, ymin = 0, ymax = 2500, crs = "EPSG:3005", vals = 1)
+  ras <- c(coarse * 2, coarse, coarse * 0.8, coarse * 0.8)
+  names(ras) <- c("ignitionProb", "escapeProb", "ignitionYearSD", "escapeYearSD")
+  ## a low spread probability, no escape minimum size: fires stay small unless the year's z is high, and
+  ## then there is still room for them on the 40- and 50-pixel blocks
+  set.seed(21)
+  s <- runFireSense(NULL, times = list(start = 1, end = 200), params = list(.plotInterval = 999, escapeSizeHa = NA),
+                    objects = list(fireSense_IgAndEscapeProbRas = ras,
+                                   fireSense_IgAndEscapeDistribution = list(ignition = "count:poisson",
+                                                                            escape = "count:poisson"),
+                                   ignitionFitRTM = coarse,
+                                   fireSense_SpreadPredicted = toySpreadProb(p = 0.05), fireSense_SpreadSD = 2))
+  byYear <- s$burnSummary[, .(fires = .N, meanSize = mean(N)), by = "year"]
+  expect_gt(nrow(byYear), 100)
+  ## with the same z behind the escapes and the spread, the two move together across years
+  expect_gt(stats::cor(byYear$fires, byYear$meanSize, method = "spearman"), 0.3)
+})
