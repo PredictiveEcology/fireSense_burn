@@ -141,3 +141,83 @@ test_that("the objective drawn from is fireSenseUtils::ignitionObjectiveTxt, not
   expect_length(drawCounts("reg:tweedie", c(1, 2), "ignition"), 2)
   expect_error(drawCounts("count:poisson", c(1, 2), "ignition"), "only 'reg:tweedie' is supported")
 })
+
+## ---- the year effect on ignitions and escapes: one z per year, shared with spread ----
+
+## `toyProbRas()` plus the two sd layers fireSense_ignitionPredict adds when the fits have a year effect
+toyProbRasSD <- function(igMean, escMean = igMean, igSD = 0, escSD = 0) {
+  r <- toyProbRas(igMean, escMean)
+  sdR <- c(toyCoarseRTM(), toyCoarseRTM())
+  terra::values(sdR) <- cbind(rep_len(igSD, 4), rep_len(escSD, 4))
+  r <- c(r, sdR)
+  names(r) <- c("ignitionProb", "escapeProb", "ignitionYearSD", "escapeYearSD")
+  r
+}
+
+toyDrawSimSD <- function(igMean, escMean = igMean, igSD = 0, escSD = 0) {
+  s <- toyDrawSim(igMean, escMean)
+  s$fireSense_IgAndEscapeProbRas <- toyProbRasSD(igMean, escMean, igSD, escSD)
+  s
+}
+
+test_that("one z moves the ignition means, the escape means and the spread probability the same way", {
+  s <- toyDrawSimSD(c(5, 5, 5, 5), escMean = 2, igSD = 0.5, escSD = 0.8)
+  sp <- toySpreadProb(p = 0.3)
+  for (z in c(1.5, -1.5)) {
+    set.seed(1)
+    ig <- drawIgnitionsAndEscapes(s, store = new.env(), z = z)
+    ## the means drawn from are the surface times exp(sd * z - sd^2 / 2), the same multiplier for every pixel
+    expect_equal(unique(ig$igProb), 5 * fireSenseUtils::yearEffectMultiplier(0.5, z))
+    expect_equal(unique(ig$escapeProb), 2 * fireSenseUtils::yearEffectMultiplier(0.8, z))
+    p <- yearSpreadProb(sp, 0.7, z = z)[westCells()]
+    if (z > 0) {
+      expect_true(all(ig$igProb > 5) && all(ig$escapeProb > 2) && all(p > 0.3))
+    } else {
+      expect_true(all(ig$igProb < 5) && all(ig$escapeProb < 2) && all(p < 0.3))
+    }
+  }
+  ## yearZ() draws z only when an sd layer is above 0
+  expect_null(yearZ(toyProbRas(c(1, 1, 1, 1))))
+  expect_null(yearZ(toyProbRasSD(c(1, 1, 1, 1), igSD = 0, escSD = 0)))
+  set.seed(2); z <- yearZ(toyProbRasSD(c(1, 1, 1, 1), igSD = 0, escSD = 0.3))
+  set.seed(2); expect_identical(z, stats::rnorm(1))
+})
+
+test_that("an sd of 0, or no sd layer, reproduces the draws without a year effect exactly", {
+  for (seed in 1:5) {
+    set.seed(seed); a <- draw(toyDrawSim(c(2, 2, 2, 2), escMean = 0.5))
+    set.seed(seed); b <- draw(toyDrawSimSD(c(2, 2, 2, 2), escMean = 0.5))                 # sd layers of 0
+    set.seed(seed); d <- drawIgnitionsAndEscapes(toyDrawSimSD(c(2, 2, 2, 2), escMean = 0.5),
+                                                 store = new.env(), z = 1.7)                # a z with sd 0
+    expect_identical(a, b)
+    expect_identical(a, d)
+  }
+  ## and in the burn event, with spread's own year effect: its z is drawn where it always was
+  burnWith <- function(seed, ras) {
+    set.seed(seed)
+    s <- runFireSense(NULL, times = list(start = 1, end = 4), params = list(.plotInterval = 99),
+                      objects = list(fireSense_IgAndEscapeProbRas = ras,
+                                     fireSense_IgAndEscapeDistribution = list(ignition = "count:poisson",
+                                                                              escape = "count:poisson"),
+                                     ignitionFitRTM = toyCoarseRTM(),
+                                     fireSense_SpreadPredicted = toySpreadProb(p = 0.3), fireSense_SpreadSD = 0.8))
+    list(s$burnSummary, s$ignitionsAndEscapes)
+  }
+  expect_identical(burnWith(3, toyProbRas(c(2, 2, 2, 2), 1)), burnWith(3, toyProbRasSD(c(2, 2, 2, 2), 1)))
+})
+
+test_that("the year effect keeps the mean ignitions and escapes over many years", {
+  set.seed(9)
+  n <- 600
+  ## small means: a coarse pixel has only 20-25 flammable fine pixels to place its ignitions on
+  counts <- replicate(n, {
+    s <- toyDrawSimSD(c(2, 2, 2, 2), escMean = 0.2, igSD = 0.5, escSD = 0.5)
+    ig <- drawIgnitionsAndEscapes(s, store = new.env(), z = stats::rnorm(1))
+    c(ignitions = nrow(ig), escapes = sum(ig$escaped), ignitedPixels = length(unique(coarseOf(ig$pixelID))))
+  })
+  expect_equal(mean(counts["ignitions", ]), 8, tolerance = 0.1)                        # 4 pixels x 2
+  ## 0.2 expected escapes per ignited pixel (the cap at the ignitions seldom binds)
+  expect_equal(sum(counts["escapes", ]) / sum(counts["ignitedPixels", ]), 0.2, tolerance = 0.15)
+  ## but the years differ more than Poisson years would (variance = mean): 8 + 64 * (exp(0.25) - 1) = 26
+  expect_gt(stats::var(counts["ignitions", ]), 2 * 8)
+})
