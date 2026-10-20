@@ -18,7 +18,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_burn.Rmd"), ## same file
   reqdPkgs = list("data.table", "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
-                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9111)",
+                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9112)",
                   "ggplot2", "ggspatial", "PredictiveEcology/reproducible@development",
                   "PredictiveEcology/SpaDES.tools@development (>= 2.1.3.9009)", "terra"),
   loadOrder = list(after = c("fireSense_ignitionPredict", "fireSense_spreadPredict")),
