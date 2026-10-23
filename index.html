@@ -266,6 +266,9 @@ max
 <th style="text-align:left;">
 paramDesc
 </th>
+<th style="text-align:left;">
+cacheKey
+</th>
 </tr></thead>
 <tbody>
 <tr>
@@ -285,6 +288,9 @@ NA
 </td>
 <td style="text-align:left;">
 Passed to <code>types</code> in <code><a href="https://spades-core.predictiveecology.org/reference/Plots.html" class="external-link">Plots()</a></code>, e.g. “screen”, “png”. <code>NULL</code> or <code>NA</code> for no plots.
+</td>
+<td style="text-align:left;">
+TRUE
 </td>
 </tr>
 <tr>
@@ -306,6 +312,9 @@ NA
 <td style="text-align:left;">
 Years between plots of annual fire IDs, cumulative burns and spread probability.
 </td>
+<td style="text-align:left;">
+TRUE
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -325,6 +334,9 @@ NA
 </td>
 <td style="text-align:left;">
 Time of the first <code>burn</code> event.
+</td>
+<td style="text-align:left;">
+TRUE
 </td>
 </tr>
 <tr>
@@ -346,6 +358,9 @@ NA
 <td style="text-align:left;">
 Years between <code>burn</code> events. <code>NA</code> burns once only.
 </td>
+<td style="text-align:left;">
+TRUE
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -365,6 +380,9 @@ NA
 </td>
 <td style="text-align:left;">
 Human-readable name for the study area used.
+</td>
+<td style="text-align:left;">
+TRUE
 </td>
 </tr>
 <tr>
@@ -386,6 +404,9 @@ NA
 <td style="text-align:left;">
 Size (ha) a fire must reach to count as escaped, as in the spread fit: each escaped fire burns this area first, whatever its spread probability, then spreads normally. <code>NA</code> spreads escaped fires from their ignition pixel only.
 </td>
+<td style="text-align:left;">
+TRUE
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -405,6 +426,9 @@ NA
 </td>
 <td style="text-align:left;">
 Passed to <code><a href="https://spades-tools.predictiveecology.org/reference/spreadCpp.html" class="external-link">SpaDES.tools::spreadCpp()</a></code> for escaped fires: attempts to jump for a fire still under <code>escapeSizeHa</code> that has nowhere left to spread. Default 20, as fireSense_spreadFit fits with; 0 is off.
+</td>
+<td style="text-align:left;">
+TRUE
 </td>
 </tr>
 <tr>
@@ -426,6 +450,9 @@ NA
 <td style="text-align:left;">
 Passed to <code><a href="https://spades-tools.predictiveecology.org/reference/spreadCpp.html" class="external-link">SpaDES.tools::spreadCpp()</a></code>: mean jump distance, in cells.
 </td>
+<td style="text-align:left;">
+TRUE
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -445,6 +472,9 @@ NA
 </td>
 <td style="text-align:left;">
 Fires spread only if this includes <code>fireSense_spreadPredict</code>. Other values are ignored.
+</td>
+<td style="text-align:left;">
+TRUE
 </td>
 </tr>
 </tbody>
