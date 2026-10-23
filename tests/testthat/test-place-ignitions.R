@@ -53,3 +53,19 @@ test_that("a coarse pixel with one fine pixel places its ignition on that pixel"
     expect_false(anyNA(res$escapes))
   }
 })
+
+test_that("a coarse pixel drawing more ignitions than it has fine pixels places one per fine pixel", {
+  ## coarse 1: one fine pixel (ID 50), 3 ignitions; coarse 3: two fine pixels (60, 61), 5 ignitions;
+  ## coarse 2: pixels 1:40, 2 ignitions
+  igs <- data.table::data.table(pixelID = c(1:40, 50L, 60L, 61L), chunkyPixels = c(rep(2L, 40), 1L, 3L, 3L))
+  igs[, `:=`(igProb = 0.1, escapeProb = 0.1, ignitions = c(`1` = 3L, `2` = 2L, `3` = 5L)[as.character(chunkyPixels)],
+             escapes = 1L)]
+  for (seed in 1:20) {
+    set.seed(seed)
+    res <- expect_no_error(placeIgnitions(igs, drawTableOf(igs)))
+    checkPlaced(igs, res)
+    expect_identical(sum(res$chunkyPixels == 1L), 1L)
+    expect_identical(sort(res$pixelID[res$chunkyPixels == 3L]), c(60L, 61L))
+    expect_identical(sum(res$chunkyPixels == 2L), 2L)
+  }
+})

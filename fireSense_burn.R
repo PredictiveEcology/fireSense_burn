@@ -460,7 +460,9 @@ fineCoarseTable <- function(map, fine) {
 #' For each row of `drawTable`, draws `ignitions` of the fine pixels of that coarse pixel and returns
 #' their rows of `igs`, in `igs` row order. One `split()` of the candidate rows replaces a scan of all of
 #' `igs` for every ignited coarse pixel. The draw is by row (`sample.int()`), so a coarse pixel with a
-#' single fine pixel places its ignition on that pixel.
+#' single fine pixel places its ignition on that pixel. A coarse pixel that drew more ignitions than it has
+#' fine pixels places one on each (at most one ignition per fine pixel and year); its `ignitions` column
+#' keeps the count drawn, so it can exceed that pixel's rows.
 #'
 #' @param igs `data.table` of fine pixels with `pixelID`, `igProb`, `ignitions`, `escapeProb`, `escapes`
 #'   and `chunkyPixels` (the coarse pixel).
@@ -475,7 +477,8 @@ placeIgnitions <- function(igs, drawTable) {
   out <- vector("list", nrow(drawTable))
   for (i in seq_len(nrow(drawTable))) {
     rows <- rowsByChunk[[as.character(drawTable$chunkyPixels[i])]]
-    drawn <- rows[sample.int(length(rows), size = drawTable$ignitions[i])]
+    ## one ignition per fine pixel at most: a coarse pixel can draw more ignitions than it has fine pixels
+    drawn <- rows[sample.int(length(rows), size = min(drawTable$ignitions[i], length(rows)))]
     out[[i]] <- igs[sort(drawn), ..cols]
   }
   ## no ignited coarse pixel: rbindlist(list()) has no columns, so keep the schema of a normal year
