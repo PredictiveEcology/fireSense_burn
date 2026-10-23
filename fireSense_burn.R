@@ -458,12 +458,9 @@ fineCoarseTable <- function(map, fine) {
 #' Place each coarse pixel's ignitions on its fine pixels
 #'
 #' For each row of `drawTable`, draws `ignitions` of the fine pixels of that coarse pixel and returns
-#' their rows of `igs`, in `igs` row order. One `split()` of the candidate rows and a pixelID-to-row
-#' lookup replace a scan of all of `igs` for every ignited coarse pixel.
-#'
-#' The `sample()` calls are made in `drawTable` order, on the candidate `pixelID`s in `igs` order. This
-#' includes the `sample(x, size)` behaviour for a single candidate `x`, which draws from `1:x`; the
-#' pixels with those IDs are then returned, wherever they are. That quirk is kept so results do not change.
+#' their rows of `igs`, in `igs` row order. One `split()` of the candidate rows replaces a scan of all of
+#' `igs` for every ignited coarse pixel. The draw is by row (`sample.int()`), so a coarse pixel with a
+#' single fine pixel places its ignition on that pixel.
 #'
 #' @param igs `data.table` of fine pixels with `pixelID`, `igProb`, `ignitions`, `escapeProb`, `escapes`
 #'   and `chunkyPixels` (the coarse pixel).
@@ -474,15 +471,12 @@ fineCoarseTable <- function(map, fine) {
 placeIgnitions <- function(igs, drawTable) {
   sel <- which(igs$chunkyPixels %in% drawTable$chunkyPixels)
   rowsByChunk <- split(sel, igs$chunkyPixels[sel])
-  rowOfPixel <- integer(max(igs$pixelID, 0L))
-  rowOfPixel[igs$pixelID] <- seq_len(nrow(igs))
   cols <- c("pixelID", "igProb", "ignitions", "escapeProb", "escapes", "chunkyPixels")
   out <- vector("list", nrow(drawTable))
   for (i in seq_len(nrow(drawTable))) {
     rows <- rowsByChunk[[as.character(drawTable$chunkyPixels[i])]]
-    drawn <- sample(igs$pixelID[rows], size = drawTable$ignitions[i])
-    hit <- rowOfPixel[drawn[drawn >= 1 & drawn <= length(rowOfPixel)]]
-    out[[i]] <- igs[sort(hit[hit > 0]), ..cols]
+    drawn <- rows[sample.int(length(rows), size = drawTable$ignitions[i])]
+    out[[i]] <- igs[sort(drawn), ..cols]
   }
   ## no ignited coarse pixel: rbindlist(list()) has no columns, so keep the schema of a normal year
   if (!length(out)) return(igs[integer(0), ..cols])
