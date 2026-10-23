@@ -1,17 +1,4 @@
-## Placing ignitions on fine pixels must give the same pixels and the same random stream as the
-## per-coarse-pixel scans of the whole fine-pixel table it replaced.
-
-## reference: the code before placeIgnitions() (kept here only to compare against)
-oldPlaceIgnitions <- function(igs, drawTable) {
-  lapply(drawTable$chunkyPixels,
-         FUN = function(n, draw = drawTable, ig = igs) {
-           sampledChunk <- draw[chunkyPixels == n]
-           pixelID_pop <- igs[chunkyPixels == sampledChunk$chunkyPixels]
-           drawn <- sample(pixelID_pop$pixelID, size = sampledChunk$ignitions)
-           ig[pixelID %in% drawn, .(pixelID, igProb, ignitions, escapeProb, escapes, chunkyPixels)]
-         }) |>
-    data.table::rbindlist()
-}
+## placeIgnitions() draws each ignited coarse pixel's ignitions from that coarse pixel's own fine pixels.
 
 ## fine pixels (not in pixelID order, as after a join) of coarse pixels 1-6; coarse pixel `ignited` have
 ## ignitions; coarse 3 has a single fine pixel, coarse 6 has none ignited
@@ -26,20 +13,23 @@ toyIgs <- function(ignitions = c(`1` = 2L, `2` = 1L, `3` = 1L, `4` = 3L, `5` = 0
 }
 drawTableOf <- function(igs) unique(igs[ignitions > 0, .(chunkyPixels, ignitions, escapes)])
 
-compareToOld <- function(igs, seed) {
-  drawTable <- drawTableOf(igs)
-  set.seed(seed); old <- oldPlaceIgnitions(igs, drawTable); seedOld <- .Random.seed
-  set.seed(seed); new <- placeIgnitions(igs, drawTable);    seedNew <- .Random.seed
-  expect_identical(new, old)
-  expect_identical(seedNew, seedOld)
-  invisible(new)
+checkPlaced <- function(igs, res) {
+  expected <- unique(igs[ignitions > 0, .(chunkyPixels, ignitions)])
+  ## right count per coarse pixel (never more than its fine pixels)
+  counts <- res[, .N, by = "chunkyPixels"]
+  want <- igs[ignitions > 0, .(N = min(ignitions[1], .N)), by = "chunkyPixels"]
+  expect_identical(counts[order(chunkyPixels)]$N, want[order(chunkyPixels)]$N)
+  ## each drawn pixel belongs to its own coarse pixel
+  expect_true(all(igs$chunkyPixels[match(res$pixelID, igs$pixelID)] == res$chunkyPixels))
+  expect_false(anyDuplicated(res$pixelID) > 0)
 }
 
-test_that("placeIgnitions gives the old ignitions and random stream, for several seeds", {
-  ## coarse 5 and 6 have no ignitions (no candidates drawn); coarse 3 has exactly one candidate but
-  ## here its pixel ID is 11, so the single-candidate draw is from 1:11 -- the old behaviour, kept
+test_that("placeIgnitions places the right count, within each coarse pixel, without duplicates", {
   igs <- toyIgs()
-  for (seed in c(1, 2, 3, 42, 2024, 99999)) compareToOld(igs, seed)
+  for (seed in c(1, 2, 3, 42, 2024, 99999)) {
+    set.seed(seed)
+    checkPlaced(igs, placeIgnitions(igs, drawTableOf(igs)))
+  }
 })
 
 test_that("coarse pixels with zero ignitions place nothing and use no random numbers", {
@@ -50,13 +40,16 @@ test_that("coarse pixels with zero ignitions place nothing and use no random num
   expect_identical(.Random.seed, before)
 })
 
-test_that("a coarse pixel with one candidate keeps the sample(x, size) draw from 1:x", {
-  ## only coarse 3 is ignited; its one fine pixel has ID 11. The old code draws from 1:11
-  igs <- toyIgs(ignitions = c(`1` = 0L, `2` = 0L, `3` = 1L, `4` = 0L, `5` = 0L, `6` = 0L))
-  for (seed in 1:20) compareToOld(igs, seed)
-  ## an ID of 1 draws pixel 1 (from 1:1)
-  igs1 <- toyIgs(ignitions = c(`1` = 0L, `2` = 0L, `3` = 1L, `4` = 0L, `5` = 0L, `6` = 0L))
-  igs1[chunkyPixels == 3, pixelID := 1L]
-  igs1[pixelID == 1L & chunkyPixels != 3, pixelID := 21L]
-  for (seed in 1:5) compareToOld(igs1, seed)
+test_that("a coarse pixel with one fine pixel places its ignition on that pixel", {
+  ## coarse 1: one fine pixel (ID 50), 1 ignition; coarse 2: pixels 1:40, no ignitions (escapes NA)
+  igs <- data.table::data.table(pixelID = c(1:40, 50L), chunkyPixels = c(rep(2L, 40), 1L))
+  igs[, `:=`(igProb = 0.1, escapeProb = 0.1, ignitions = ifelse(chunkyPixels == 1L, 1L, 0L),
+             escapes = ifelse(chunkyPixels == 1L, 1L, NA_integer_))]
+  for (seed in 1:20) {
+    set.seed(seed)
+    res <- placeIgnitions(igs, drawTableOf(igs))
+    expect_identical(res$pixelID, 50L)
+    expect_identical(res$chunkyPixels, 1L)
+    expect_false(anyNA(res$escapes))
+  }
 })
