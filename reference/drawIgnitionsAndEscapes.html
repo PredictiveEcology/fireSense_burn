@@ -3,7 +3,7 @@
 for coarse pixels with ignitions, draws escapes from $escape with mean escapeProb, at most one per ignition.
 With z, both means are first multiplied by the year effect (fireSenseUtils::yearEffectMultiplier() with
 the ignitionYearSD and escapeYearSD layers), so a year with z &amp;gt; 0 has more ignitions, more escapes and,
-through yearSpreadProb(), more spread.
+but not more spread: spread has its own z (yearSpreadProb()).
 Each ignition is placed in a random flammable flammableRTM pixel inside its coarse pixel, and
 which of a coarse pixel's ignitions escaped is drawn: exactly escapes of them."><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
 <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
@@ -63,7 +63,7 @@ which of a coarse pixel's ignitions escaped is drawn: exactly escapes of them.">
 for coarse pixels with ignitions, draws escapes from <code>$escape</code> with mean <code>escapeProb</code>, at most one per ignition.
 With <code>z</code>, both means are first multiplied by the year effect (<code><a href="https://rdrr.io/pkg/fireSenseUtils/man/yearEffect.html" class="external-link">fireSenseUtils::yearEffectMultiplier()</a></code> with
 the <code>ignitionYearSD</code> and <code>escapeYearSD</code> layers), so a year with z &gt; 0 has more ignitions, more escapes and,
-through <code><a href="yearSpreadProb.html">yearSpreadProb()</a></code>, more spread.
+but not more spread: spread has its own z (<code><a href="yearSpreadProb.html">yearSpreadProb()</a></code>).
 Each ignition is placed in a random flammable <code>flammableRTM</code> pixel inside its coarse pixel, and
 which of a coarse pixel's ignitions escaped is drawn: exactly <code>escapes</code> of them.</p>
     </div>

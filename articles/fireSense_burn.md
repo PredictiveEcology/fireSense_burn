@@ -69,7 +69,7 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
   <tr>
    <td style="text-align:left;"> fireSense_SpreadSD </td>
    <td style="text-align:left;"> SpatRaster&amp;#124;numeric </td>
-   <td style="text-align:left;"> Sd of the per-year random effect (on logit spread probability; on x with `fireSense_SpreadPowerLaw`), as fitted by fireSense_spreadFit (`yearSpreadSD`): a raster aligned with `fireSense_SpreadPredicted` (from fireSense_spreadPredict, per ELF) or one number. Each year draws one z ~ N(0, 1), the same z that scales that year's ignitions and escapes (`fireSense_IgAndEscapeProbRas`); all of that year's fires spread with plogis(qlogis(p) + z sd). NULL or 0: no effect. </td>
+   <td style="text-align:left;"> Sd of the per-year random effect (on logit spread probability; on x with `fireSense_SpreadPowerLaw`), as fitted by fireSense_spreadFit (`yearSpreadSD`): a raster aligned with `fireSense_SpreadPredicted` (from fireSense_spreadPredict, per ELF) or one number. Each year draws one z ~ N(0, 1), independent of the z that scales that year's ignitions and escapes (`fireSense_IgAndEscapeProbRas`); all of that year's fires spread with plogis(qlogis(p) + z sd). NULL or 0: no effect. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
@@ -87,7 +87,7 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
   <tr>
    <td style="text-align:left;"> fireSense_IgAndEscapeProbRas </td>
    <td style="text-align:left;"> SpatRaster </td>
-   <td style="text-align:left;"> Two layers at the resolution of `ignitionFitRTM`, from fireSense_ignitionPredict: `ignitionProb`, the expected ignitions per pixel and year, and `escapeProb`, the expected escapes per pixel and year given an ignition. Ignitions and escapes are drawn from these each year. Optional layers `ignitionYearSD` and `escapeYearSD`: the sd of the year effect of each; a year multiplies the means by exp(sd z - sd^2 / 2), with the year's z shared with spread. Absent or 0: no year effect. </td>
+   <td style="text-align:left;"> Two layers at the resolution of `ignitionFitRTM`, from fireSense_ignitionPredict: `ignitionProb`, the expected ignitions per pixel and year, and `escapeProb`, the expected escapes per pixel and year given an ignition. Ignitions and escapes are drawn from these each year. Optional layers `ignitionYearSD` and `escapeYearSD`: the sd of the year effect of each; a year multiplies the means by exp(sd z - sd^2 / 2), with the year's z, which spread does not share. Absent or 0: no year effect. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
