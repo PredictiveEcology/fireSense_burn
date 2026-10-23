@@ -317,23 +317,37 @@ test_that("a year whose ignitions do not escape burns only its own small fires, 
   expect_identical(sim$burnSummary[year == 2]$igLoc, 10L)
 })
 
-test_that("one z per year: years with many escaped fires are also years with large fires", {
-  ## the 2 x 2 coarse grid of test-draw.R: 2 expected ignitions and 1 expected escape per coarse pixel, sd 0.8 each
-  ## (a coarse pixel has 20-25 flammable fine pixels to place its ignitions on, so the means stay small)
+test_that("spread draws its own z: it is independent of the z behind the ignitions and escapes", {
+  ## the 2 x 2 coarse grid of test-draw.R, with a year effect on ignitions and escapes and on spread
   coarse <- terra::rast(nrows = 2, ncols = 2, xmin = 0, xmax = 2500, ymin = 0, ymax = 2500, crs = "EPSG:3005", vals = 1)
   ras <- c(coarse * 2, coarse, coarse * 0.8, coarse * 0.8)
   names(ras) <- c("ignitionProb", "escapeProb", "ignitionYearSD", "escapeYearSD")
-  ## a low spread probability, no escape minimum size: fires stay small unless the year's z is high, and
-  ## then there is still room for them on the 40- and 50-pixel blocks
+  sd <- 1
+  p <- 0.3
+  sim <- runFireSense(NULL, times = list(start = 1, end = 2000), params = list(.plotInterval = 9999, escapeSizeHa = NA), doSpades = FALSE,
+                      objects = list(fireSense_IgAndEscapeProbRas = ras,
+                                     fireSense_IgAndEscapeDistribution = list(ignition = "count:poisson",
+                                                                              escape = "count:poisson"),
+                                     ignitionFitRTM = coarse,
+                                     fireSense_SpreadPredicted = toySpreadProb(p = p), fireSense_SpreadSD = sd))
+  ## burn() looks its helpers up in the module's environment: wrap yearZ() to record the z of the ignitions and
+  ## escapes, and yearSpreadProb() to record the z that shifted the spread probability
+  burn <- sim@.xData$.mods$fireSense_burn$burn
+  mods <- environment(burn)
+  zIg <- zPairs <- numeric()
+  realZ <- mods$yearZ
+  realSpread <- mods$yearSpreadProb
+  mods$yearZ <- function(probRas) { z <- realZ(probRas); zIg <<- c(zIg, z); z }
+  mods$yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL) {
+    q <- realSpread(spreadProbRas, sd, powerLaw, z)
+    zPairs <<- c(zPairs, zIg[length(zIg)], (stats::qlogis(q[1]) - stats::qlogis(p)) / sd)
+    q
+  }
   set.seed(21)
-  s <- runFireSense(NULL, times = list(start = 1, end = 200), params = list(.plotInterval = 999, escapeSizeHa = NA),
-                    objects = list(fireSense_IgAndEscapeProbRas = ras,
-                                   fireSense_IgAndEscapeDistribution = list(ignition = "count:poisson",
-                                                                            escape = "count:poisson"),
-                                   ignitionFitRTM = coarse,
-                                   fireSense_SpreadPredicted = toySpreadProb(p = 0.05), fireSense_SpreadSD = 2))
-  byYear <- s$burnSummary[, .(fires = .N, meanSize = mean(N)), by = "year"]
-  expect_gt(nrow(byYear), 100)
-  ## with the same z behind the escapes and the spread, the two move together across years
-  expect_gt(stats::cor(byYear$fires, byYear$meanSize, method = "spearman"), 0.3)
+  suppressMessages(SpaDES.core::spades(sim, debug = FALSE))
+  ## yearSpreadProb() only runs in a year with an escape; the z of the ignitions is recorded every year
+  expect_length(zIg, 2000)
+  pairs <- matrix(zPairs, ncol = 2, byrow = TRUE)   # that year's ignition z, spread z
+  expect_gt(nrow(pairs), 1000)
+  expect_lt(abs(stats::cor(pairs[, 1], pairs[, 2])), 0.1)
 })

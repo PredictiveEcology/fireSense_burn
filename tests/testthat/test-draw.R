@@ -160,7 +160,7 @@ toyDrawSimSD <- function(igMean, escMean = igMean, igSD = 0, escSD = 0) {
   s
 }
 
-test_that("one z moves the ignition means, the escape means and the spread probability the same way", {
+test_that("one z moves the ignition means, the escape means and (given the same z) the spread probability the same way", {
   s <- toyDrawSimSD(c(5, 5, 5, 5), escMean = 2, igSD = 0.5, escSD = 0.8)
   sp <- toySpreadProb(p = 0.3)
   for (z in c(1.5, -1.5)) {
