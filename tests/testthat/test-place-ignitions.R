@@ -54,18 +54,50 @@ test_that("a coarse pixel with one fine pixel places its ignition on that pixel"
   }
 })
 
-test_that("a coarse pixel drawing more ignitions than it has fine pixels places one per fine pixel", {
-  ## coarse 1: one fine pixel (ID 50), 3 ignitions; coarse 3: two fine pixels (60, 61), 5 ignitions;
-  ## coarse 2: pixels 1:40, 2 ignitions
+## a coarse pixel that draws more ignitions than it has fine pixels places every ignition: each fine pixel
+## once, then the excess with replacement, so a pixelID can repeat
+test_that("a single-pixel coarse cell with 3 ignitions yields 3 rows on that pixel", {
+  igs <- data.table::data.table(pixelID = c(1:40, 50L), chunkyPixels = c(rep(2L, 40), 1L))
+  igs[, `:=`(igProb = 0.1, escapeProb = 0.1, ignitions = ifelse(chunkyPixels == 1L, 3L, 0L), escapes = 1L)]
+  for (seed in 1:10) {
+    set.seed(seed)
+    res <- placeIgnitions(igs, drawTableOf(igs))
+    expect_identical(res$pixelID, c(50L, 50L, 50L))
+    expect_identical(res$chunkyPixels, rep(1L, 3))
+  }
+})
+
+test_that("every drawn ignition is placed, in its own coarse pixel", {
   igs <- data.table::data.table(pixelID = c(1:40, 50L, 60L, 61L), chunkyPixels = c(rep(2L, 40), 1L, 3L, 3L))
   igs[, `:=`(igProb = 0.1, escapeProb = 0.1, ignitions = c(`1` = 3L, `2` = 2L, `3` = 5L)[as.character(chunkyPixels)],
              escapes = 1L)]
   for (seed in 1:20) {
     set.seed(seed)
-    res <- expect_no_error(placeIgnitions(igs, drawTableOf(igs)))
-    checkPlaced(igs, res)
-    expect_identical(sum(res$chunkyPixels == 1L), 1L)
-    expect_identical(sort(res$pixelID[res$chunkyPixels == 3L]), c(60L, 61L))
-    expect_identical(sum(res$chunkyPixels == 2L), 2L)
+    res <- placeIgnitions(igs, drawTableOf(igs))
+    expect_identical(as.vector(table(res$chunkyPixels)), c(3L, 2L, 5L))
+    expect_true(all(igs$chunkyPixels[match(res$pixelID, igs$pixelID)] == res$chunkyPixels))
   }
+})
+
+test_that("a cell with 2 pixels and 5 ignitions puts every pixel at least once", {
+  igs <- data.table::data.table(pixelID = c(60L, 61L), chunkyPixels = 3L, igProb = 0.1, escapeProb = 0.1,
+                                ignitions = 5L, escapes = 1L)
+  for (seed in 1:20) {
+    set.seed(seed)
+    res <- placeIgnitions(igs, drawTableOf(igs))
+    expect_identical(nrow(res), 5L)
+    expect_true(all(c(60L, 61L) %in% res$pixelID))
+  }
+})
+
+test_that("when ignitions <= fine pixels the draw is the one development made (same random stream)", {
+  igs <- toyIgs()
+  set.seed(11)
+  want <- igs[, .SD, .SDcols = names(igs)][sort(unlist(lapply(seq_len(nrow(drawTableOf(igs))), function(i) {
+    dt <- drawTableOf(igs)
+    rows <- which(igs$chunkyPixels == dt$chunkyPixels[i])
+    rows[sample.int(length(rows), size = dt$ignitions[i])]
+  })))]
+  set.seed(11)
+  expect_identical(placeIgnitions(igs, drawTableOf(igs))[order(pixelID)], want[order(pixelID)])
 })
