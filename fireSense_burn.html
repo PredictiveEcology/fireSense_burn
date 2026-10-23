@@ -2973,7 +2973,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">fireSense_burn Manual</h1>
 <h3 class="subtitle">v.0.0.0.9000</h3>
-<h4 class="date">Last updated: 2026-10-20</h4>
+<h4 class="date">Last updated: 2026-10-23</h4>
 
 </div>
 
@@ -3175,6 +3175,9 @@ max
 <th style="text-align:left;">
 paramDesc
 </th>
+<th style="text-align:left;">
+cacheKey
+</th>
 </tr>
 </thead>
 <tbody>
@@ -3196,6 +3199,9 @@ NA
 <td style="text-align:left;">
 Passed to <code>types</code> in <code>Plots()</code>, e.g. “screen”, “png”. <code>NULL</code> or <code>NA</code> for no plots.
 </td>
+<td style="text-align:left;">
+TRUE
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -3215,6 +3221,9 @@ NA
 </td>
 <td style="text-align:left;">
 Years between plots of annual fire IDs, cumulative burns and spread probability.
+</td>
+<td style="text-align:left;">
+TRUE
 </td>
 </tr>
 <tr>
@@ -3236,6 +3245,9 @@ NA
 <td style="text-align:left;">
 Time of the first <code>burn</code> event.
 </td>
+<td style="text-align:left;">
+TRUE
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -3255,6 +3267,9 @@ NA
 </td>
 <td style="text-align:left;">
 Years between <code>burn</code> events. <code>NA</code> burns once only.
+</td>
+<td style="text-align:left;">
+TRUE
 </td>
 </tr>
 <tr>
@@ -3276,6 +3291,9 @@ NA
 <td style="text-align:left;">
 Human-readable name for the study area used.
 </td>
+<td style="text-align:left;">
+TRUE
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -3295,6 +3313,9 @@ NA
 </td>
 <td style="text-align:left;">
 Size (ha) a fire must reach to count as escaped, as in the spread fit: each escaped fire burns this area first, whatever its spread probability, then spreads normally. <code>NA</code> spreads escaped fires from their ignition pixel only.
+</td>
+<td style="text-align:left;">
+TRUE
 </td>
 </tr>
 <tr>
@@ -3316,6 +3337,9 @@ NA
 <td style="text-align:left;">
 Passed to <code>SpaDES.tools::spreadCpp()</code> for escaped fires: attempts to jump for a fire still under <code>escapeSizeHa</code> that has nowhere left to spread. Default 20, as fireSense_spreadFit fits with; 0 is off.
 </td>
+<td style="text-align:left;">
+TRUE
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -3336,6 +3360,9 @@ NA
 <td style="text-align:left;">
 Passed to <code>SpaDES.tools::spreadCpp()</code>: mean jump distance, in cells.
 </td>
+<td style="text-align:left;">
+TRUE
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -3355,6 +3382,9 @@ NA
 </td>
 <td style="text-align:left;">
 Fires spread only if this includes <code>fireSense_spreadPredict</code>. Other values are ignored.
+</td>
+<td style="text-align:left;">
+TRUE
 </td>
 </tr>
 </tbody>
