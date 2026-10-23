@@ -208,7 +208,7 @@ burn <- function(sim) {
   ## objective), so a forecast spreads fires as the fitted parameters assume: an escaped fire burns its
   ## first escapeSizeHa whatever the spread probability, then spreads. Several fires starting on one
   ## pixel are one fire: the first start burns the pixel and the others cannot.
-  escLocs <- ig$pixelID[ig$escaped %in% TRUE]
+  escLocs <- unique(ig$pixelID[ig$escaped %in% TRUE])
   minPx <- if (length(Par$escapeSizeHa) && !is.na(Par$escapeSizeHa))
     fireSenseUtils::escapeSizePixels(Par$escapeSizeHa, sim$fireSense_SpreadPredicted) else 0L
   spreadState <- data.table(initialPixels = integer(), pixels = integer())
@@ -460,7 +460,9 @@ fineCoarseTable <- function(map, fine) {
 #' For each row of `drawTable`, draws `ignitions` of the fine pixels of that coarse pixel and returns
 #' their rows of `igs`, in `igs` row order. One `split()` of the candidate rows replaces a scan of all of
 #' `igs` for every ignited coarse pixel. The draw is by row (`sample.int()`), so a coarse pixel with a
-#' single fine pixel places its ignition on that pixel.
+#' single fine pixel places its ignition on that pixel. A coarse pixel that drew more ignitions than it has
+#' fine pixels gets one on each fine pixel and the excess on fine pixels drawn with replacement, so every
+#' drawn ignition is placed (one row each) and a `pixelID` can repeat.
 #'
 #' @param igs `data.table` of fine pixels with `pixelID`, `igProb`, `ignitions`, `escapeProb`, `escapes`
 #'   and `chunkyPixels` (the coarse pixel).
@@ -475,7 +477,10 @@ placeIgnitions <- function(igs, drawTable) {
   out <- vector("list", nrow(drawTable))
   for (i in seq_len(nrow(drawTable))) {
     rows <- rowsByChunk[[as.character(drawTable$chunkyPixels[i])]]
-    drawn <- rows[sample.int(length(rows), size = drawTable$ignitions[i])]
+    n <- drawTable$ignitions[i]
+    drawn <- rows[sample.int(length(rows), size = min(n, length(rows)))]
+    ## more ignitions than fine pixels: every fine pixel has one, the excess goes on random fine pixels
+    if (n > length(rows)) drawn <- c(drawn, rows[sample.int(length(rows), size = n - length(rows), replace = TRUE)])
     out[[i]] <- igs[sort(drawn), ..cols]
   }
   ## no ignited coarse pixel: rbindlist(list()) has no columns, so keep the schema of a normal year

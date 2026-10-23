@@ -132,6 +132,14 @@ test_that("two escapes on one pixel burn the block once", {
   expect_identical(vals(sim$burnMap)[westCells()], rep(1, 40)) # not 2
 })
 
+test_that("the same pixel ignited and escaping twice (two rows) is one fire", {
+  sim <- runFireSense(ig(c(1L, 1L), c(1L, 1L)))
+  expect_identical(sim$burnSummary$N, 40L)
+  expect_identical(nrow(sim$burnSummary), 1L)
+  expect_identical(sort(sim$burnDT$pixels), westCells())
+  expect_identical(vals(sim$burnMap)[westCells()], rep(1, 40))
+})
+
 test_that("burnMap and burnSummary accumulate over years", {
   sim <- runFireSense(ig(1L, 1L), times = list(start = 1, end = 3))
   bm <- vals(sim$burnMap)
