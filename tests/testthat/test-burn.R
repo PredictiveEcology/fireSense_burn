@@ -337,7 +337,7 @@ test_that("spread draws its own z: it is independent of the z behind the ignitio
   zIg <- zPairs <- numeric()
   realZ <- mods$yearZ
   realSpread <- mods$yearSpreadProb
-  mods$yearZ <- function(probRas) { z <- realZ(probRas); zIg <<- c(zIg, z); z }
+  mods$yearZ <- function(probRas) { z <- realZ(probRas); zIg <<- c(zIg, z[["ignition"]]); z }
   mods$yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL) {
     q <- realSpread(spreadProbRas, sd, powerLaw, z)
     zPairs <<- c(zPairs, zIg[length(zIg)], (stats::qlogis(q[1]) - stats::qlogis(p)) / sd)
