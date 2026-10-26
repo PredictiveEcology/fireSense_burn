@@ -181,7 +181,7 @@ emptyBurnRaster <- function(template) rast(template, vals = NA)
 
 #' Draw this year's ignitions and escapes, then spread this year's escaped fires
 #'
-#' Draws the year's z (`yearZ()`), shared by ignitions and escapes but not by spread, and the ignitions and escapes
+#' Draws the year's z for ignitions and escapes (`yearZ()`), each its own draw as spread's is, and the ignitions and escapes
 #' (`drawIgnitionsAndEscapes()`), then spreads fires with `SpaDES.tools::spreadCpp()` from every pixel in
 #' `sim$ignitionsAndEscapes` with `escapes > 0`, then updates the burn outputs.
 #' Does nothing if there are no escapes.
@@ -201,11 +201,13 @@ burn <- function(sim) {
 
   ## Every random draw of ignitions and escapes is made here, from the surfaces fireSense_ignitionPredict
   ## predicts. Without the surface, a supplied `ignitionsAndEscapes` is spread as it is.
-  ## The year's z for ignitions and escapes, one per burn event; they are one model family and share it. NULL
-  ## when their fits have no year effect. Spread draws its own z in yearSpreadProb() below: drought already enters
-  ## every model as a covariate, so the random year effect is what is left after climate, and nothing says that
-  ## a year with many escapes is also a year of hard spread. The fit draws the spread year effect independently
-  ## of the escapes too. Sharing one z made busy years spread hard and burned about twice the area.
+  ## The year's z for ignitions and for escapes, one independent draw each per burn event. NULL when their fits
+  ## have no year effect. Spread draws its own z in yearSpreadProb() below. Drought already enters every model as a
+  ## covariate, so the random year effect is what is left after climate, and nothing says that a year with many
+  ## ignitions is a year in which each ignition escapes more often, or spreads hard: in the fit data the escape
+  ## model's year residual is uncorrelated with the ignition model's (r = -0.001). Escapes are drawn only where an
+  ## ignition fell, so a shared z multiplied the two: escapes were inflated by exp(ignitionYearSD * escapeYearSD),
+  ## and sharing spread's z burned about twice the area.
   ## With ignitionSource = "observedEscapes" the year's observed escapes are spread instead and nothing is drawn,
   ## so a hindcast tests spread alone.
   if (identical(Par$ignitionSource, "observedEscapes")) {
@@ -297,14 +299,14 @@ drawCounts <- function(objective, mean, what) {
 #' Draws ignitions per coarse pixel from `fireSense_IgAndEscapeDistribution$ignition` with mean `ignitionProb`;
 #' for coarse pixels with ignitions, draws escapes from `$escape` with mean `escapeProb`, at most one per ignition.
 #' With `z`, both means are first multiplied by the year effect (`fireSenseUtils::yearEffectMultiplier()` with
-#' the `ignitionYearSD` and `escapeYearSD` layers), so a year with z > 0 has more ignitions, more escapes and,
-#' but not more spread: spread has its own z (`yearSpreadProb()`).
+#' the `ignitionYearSD` and `escapeYearSD` layers), each with its own z and its own sd: a year with a high
+#' ignition z does not have a high escape z, nor more spread (spread has its own z, `yearSpreadProb()`).
 #' Each ignition is placed in a random flammable `flammableRTM` pixel inside its coarse pixel, and
 #' which of a coarse pixel's ignitions escaped is drawn: exactly `escapes` of them.
 #'
 #' @param sim A `simList`.
 #' @param store An environment to keep the coarse-to-fine mapping in (the module's `mod`).
-#' @param z The year's z (`yearZ()`), or `NULL`: no year effect.
+#' @param z The year's z (`yearZ()`: `c(ignition = , escape = )`), or `NULL`: no year effect.
 #'
 #' @return A `data.table`, one row per ignition, in random order: `pixelID`, `igProb`, `ignitions`,
 #'   `escapeProb`, `escapes`, `escaped`. `igProb` and `escapeProb` are the means drawn from, after the year effect.
@@ -321,8 +323,8 @@ drawIgnitionsAndEscapes <- function(sim, store, z = NULL) {
     ## the year's multiplier has mean 1 over z, so the long-run means are kept and stay valid Poisson means
     ras <- sim$fireSense_IgAndEscapeProbRas
     set(coarse, NULL, c("igProb", "escapeProb"),
-        list(coarse$igProb * fireSenseUtils::yearEffectMultiplier(yearSDLayer(ras, "ignitionYearSD"), z),
-             coarse$escapeProb * fireSenseUtils::yearEffectMultiplier(yearSDLayer(ras, "escapeYearSD"), z)))
+        list(coarse$igProb * fireSenseUtils::yearEffectMultiplier(yearSDLayer(ras, "ignitionYearSD"), z[["ignition"]]),
+             coarse$escapeProb * fireSenseUtils::yearEffectMultiplier(yearSDLayer(ras, "escapeYearSD"), z[["escape"]])))
   }
   coarse <- coarse[!is.na(coarse$igProb), ]
   igns <- drawCounts(dist$ignition, coarse$igProb, "ignition")
@@ -405,16 +407,17 @@ smallFires <- function(loci, sizesHa, landscape, spreadProb, burned = integer())
 
 #' The year's z, when the ignition or escape fits have a year effect
 #'
-#' One z ~ N(0, 1) per `burn` event, shared by the ignitions and the escapes, not by spread (`yearSpreadProb()`
-#' draws its own).
+#' Two independent z ~ N(0, 1) per `burn` event, one for the ignitions and one for the escapes; spread
+#' (`yearSpreadProb()`) draws its own third.
 #' It is drawn here only when `ignitionYearSD` or `escapeYearSD` is above 0 somewhere; otherwise `NULL`.
 #'
 #' @param probRas `fireSense_IgAndEscapeProbRas`, or `NULL`.
-#' @return One number, or `NULL`.
+#' @return `c(ignition = , escape = )`, or `NULL`.
 yearZ <- function(probRas) {
   if (is.null(probRas)) return(NULL)
   sds <- intersect(c("ignitionYearSD", "escapeYearSD"), names(probRas))
-  if (length(sds) && any(terra::values(probRas[[sds]], mat = FALSE) > 0, na.rm = TRUE)) stats::rnorm(1)
+  if (length(sds) && any(terra::values(probRas[[sds]], mat = FALSE) > 0, na.rm = TRUE))
+    c(ignition = stats::rnorm(1), escape = stats::rnorm(1))
 }
 
 #' One year-effect sd layer of `fireSense_IgAndEscapeProbRas`, as a vector; 0 where it is absent
