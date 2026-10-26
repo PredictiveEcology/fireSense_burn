@@ -22,6 +22,7 @@ test_that("inputs are the expected names and classes", {
       fireSense_SpreadPredicted         = "SpatRaster",
       fireSense_SpreadSD                = "SpatRaster|numeric",
       flammableRTM                      = "SpatRaster",
+      ignitionFirePoints                = "SpatVector",
       ignitionFitRTM                    = "SpatRaster",
       nonEscapedFireSizesHa             = "numeric",
       rasterToMatch                     = "SpatRaster")
@@ -49,6 +50,7 @@ test_that("parameters are the expected names and classes", {
                 .runInterval          = "numeric",
                 .studyAreaName        = "character",
                 escapeSizeHa          = "numeric",
+                ignitionSource        = "character",
                 jumpMeanDist          = "numeric",
                 jumpTries             = "integer",
                 whichModulesToPrepare = "character")
@@ -65,6 +67,7 @@ test_that("parameter defaults are unchanged", {
   expect_identical(as.numeric(p$.runInitialTime), 7)
   expect_identical(p$.runInterval, 1)
   expect_identical(p$escapeSizeHa, 50)
+  expect_identical(p$ignitionSource, "predicted")
   expect_identical(p$jumpTries, 20L)
   expect_identical(p$jumpMeanDist, 3)
   expect_identical(p$whichModulesToPrepare,

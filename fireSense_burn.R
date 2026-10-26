@@ -37,6 +37,12 @@ defineModule(sim, list(
                     paste("Size (ha) a fire must reach to count as escaped, as in the spread fit: each escaped",
                           "fire burns this area first, whatever its spread probability, then spreads normally.",
                           "`NA` spreads escaped fires from their ignition pixel only.")),
+    defineParameter("ignitionSource", "character", "predicted", NA, NA,
+                    paste("Where each year's fires start. `\"predicted\"`: ignitions and escapes are drawn from",
+                          "`fireSense_IgAndEscapeProbRas`. `\"observedEscapes\"` (for hindcasts that test spread alone):",
+                          "the year's observed escapes in `ignitionFirePoints` (fires of at least `escapeSizeHa` and larger",
+                          "than a pixel, of year `floor(time(sim))`) are spread from the pixels of their points, and nothing",
+                          "is drawn from the predicted surfaces. Observed fires that did not escape are left out.")),
     defineParameter("jumpTries", "integer", 20L, 0L, NA,
                     paste("Passed to `SpaDES.tools::spreadCpp()` for escaped fires: attempts to jump for a fire",
                           "still under `escapeSizeHa` that has nowhere left to spread. Default 20, as fireSense_spreadFit fits",
@@ -75,6 +81,10 @@ defineModule(sim, list(
     expectsInput("fireSense_IgAndEscapeDistribution", "list",
                  paste("`list(ignition = , escape = )`, from fireSense_ignitionPredict: the objective the ignition and",
                        "escape models were fitted with. Only `\"count:poisson\"` can be drawn from.")),
+    expectsInput("ignitionFirePoints", "SpatVector",
+                 paste("Only with `ignitionSource = \"observedEscapes\"`: observed fire points with columns `YEAR`",
+                       "and `SIZE_HA`, in the CRS of `rasterToMatch` (from fireSense_dataPrepFit: the NFDB",
+                       "natural-cause points).")),
     expectsInput("ignitionFitRTM", "SpatRaster",
                  "The coarse raster the ignition and escape models were fitted on (from fireSense_dataPrepFit)."),
     expectsInput("nonEscapedFireSizesHa", "numeric",
@@ -90,7 +100,8 @@ defineModule(sim, list(
                         "`flammableRTM`), `igProb`, `ignitions`, `escapeProb`, `escapes` of the coarse pixel it was drawn",
                         "from, and `escaped`, whether this ignition escaped: exactly `escapes` of a coarse pixel's rows",
                         "are TRUE. Drawn each year from `fireSense_IgAndEscapeProbRas`; without that raster a supplied",
-                        "`ignitionsAndEscapes` is used as it is.")),
+                        "`ignitionsAndEscapes` is used as it is. With `ignitionSource = \"observedEscapes\"`: the",
+                        "year's observed escapes, with only `pixelID` and `escaped` (all TRUE).")),
     createsOutput("burnDT", "data.table",
                   paste("The most recent fire year's burned pixels: `initialPixels` (the fire's ignition pixel),",
                         "`pixels`, and `fire_id`.")),
@@ -126,6 +137,11 @@ doEvent.fireSense_burn = function(sim, eventTime, eventType, debug = FALSE) {
 
       if (!is.null(sim$fireSense_SpreadPredicted))
         stopifnot(length(na.omit(sim$fireSense_SpreadPredicted[])) > 0)
+      if (!P(sim)$ignitionSource %in% c("predicted", "observedEscapes"))
+        stop("fireSense_burn: ignitionSource must be \"predicted\" or \"observedEscapes\"")
+      if (identical(P(sim)$ignitionSource, "observedEscapes") &&
+          (is.null(sim$ignitionFirePoints) || is.na(P(sim)$escapeSizeHa)))
+        stop("fireSense_burn: ignitionSource = \"observedEscapes\" needs `ignitionFirePoints` and an `escapeSizeHa`")
 
       ## trying to avoid the raster warning no non-missing arguments to max
       sim$burnMap <- rast(sim$rasterToMatch)
@@ -190,9 +206,16 @@ burn <- function(sim) {
   ## every model as a covariate, so the random year effect is what is left after climate, and nothing says that
   ## a year with many escapes is also a year of hard spread. The fit draws the spread year effect independently
   ## of the escapes too. Sharing one z made busy years spread hard and burned about twice the area.
-  z <- yearZ(sim$fireSense_IgAndEscapeProbRas)
-  if (!is.null(sim$fireSense_IgAndEscapeProbRas))
-    sim$ignitionsAndEscapes <- drawIgnitionsAndEscapes(sim, store = mod, z = z)
+  ## With ignitionSource = "observedEscapes" the year's observed escapes are spread instead and nothing is drawn,
+  ## so a hindcast tests spread alone.
+  if (identical(Par$ignitionSource, "observedEscapes")) {
+    sim$ignitionsAndEscapes <- observedEscapes(sim$ignitionFirePoints, floor(time(sim) + 1e-9), tmpl,
+                                               Par$escapeSizeHa)
+  } else {
+    z <- yearZ(sim$fireSense_IgAndEscapeProbRas)
+    if (!is.null(sim$fireSense_IgAndEscapeProbRas))
+      sim$ignitionsAndEscapes <- drawIgnitionsAndEscapes(sim, store = mod, z = z)
+  }
 
   ig <- sim$ignitionsAndEscapes
   if (NROW(ig) == 0L || !"fireSense_spreadPredict" %in% P(sim)$whichModulesToPrepare)
@@ -330,6 +353,26 @@ drawIgnitionsAndEscapes <- function(sim, store, z = NULL) {
   set(pixelID_igs, NULL, "chunkyPixels", NULL)
   randomOrder <- sample.int(nrow(pixelID_igs)) # sample(1:0) would give 2 rows
   pixelID_igs[randomOrder, ] #Randomize order
+}
+
+#' A year's observed escapes, as ignitions to spread
+#'
+#' The fires of `year` in `firePoints` that escaped (`fireSenseUtils::escapedFires()`: at least `escapeSizeHa`
+#' and larger than one pixel, the fit's definition), each on the pixel of `landscape` its point falls in.
+#' Points outside `landscape` are dropped. Fires that did not escape are not returned.
+#'
+#' @param firePoints `SpatVector` with columns `YEAR` and `SIZE_HA`, in the CRS of `landscape`.
+#' @param year The fire year.
+#' @param landscape `SpatRaster` whose cell numbers `pixelID` gives.
+#' @param escapeSizeHa Size (ha) a fire must reach to count as escaped.
+#'
+#' @return A `data.table` with `pixelID` and `escaped` (all `TRUE`), one row per escape.
+observedEscapes <- function(firePoints, year, landscape, escapeSizeHa) {
+  pts <- firePoints[which(as.integer(firePoints$YEAR) == year), ]
+  esc <- fireSenseUtils::escapedFires(pts, escapeSizeHa, prod(res(landscape)) / 1e4)
+  cells <- if (nrow(esc)) terra::cellFromXY(landscape, terra::crds(esc)) else integer()
+  cells <- as.integer(cells[!is.na(cells)])
+  data.table(pixelID = cells, escaped = rep(TRUE, length(cells)))
 }
 
 #' Small fires for the ignitions that did not escape
