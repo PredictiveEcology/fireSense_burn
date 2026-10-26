@@ -2973,7 +2973,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">fireSense_burn Manual</h1>
 <h3 class="subtitle">v.0.0.0.9000</h3>
-<h4 class="date">Last updated: 2026-10-23</h4>
+<h4 class="date">Last updated: 2026-10-26</h4>
 
 </div>
 
@@ -3101,6 +3101,20 @@ list
 </td>
 <td style="text-align:left;">
 <code>list(ignition = , escape = )</code>, from fireSense_ignitionPredict: the objective the ignition and escape models were fitted with. Only <code>&quot;count:poisson&quot;</code> can be drawn from.
+</td>
+<td style="text-align:left;">
+NA
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+ignitionFirePoints
+</td>
+<td style="text-align:left;">
+SpatVector
+</td>
+<td style="text-align:left;">
+Only with <code>ignitionSource = &quot;observedEscapes&quot;</code>: observed fire points with columns <code>YEAR</code> and <code>SIZE_HA</code>, in the CRS of <code>rasterToMatch</code> (from fireSense_dataPrepFit: the NFDB natural-cause points).
 </td>
 <td style="text-align:left;">
 NA
@@ -3320,6 +3334,29 @@ TRUE
 </tr>
 <tr>
 <td style="text-align:left;">
+ignitionSource
+</td>
+<td style="text-align:left;">
+character
+</td>
+<td style="text-align:left;">
+predicted
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+Where each year’s fires start. <code>&quot;predicted&quot;</code>: ignitions and escapes are drawn from <code>fireSense_IgAndEscapeProbRas</code>. <code>&quot;observedEscapes&quot;</code> (for hindcasts that test spread alone): the year’s observed escapes in <code>ignitionFirePoints</code> (fires of at least <code>escapeSizeHa</code> and larger than a pixel, of year <code>floor(time(sim))</code>) are spread from the pixels of their points, and nothing is drawn from the predicted surfaces. Observed fires that did not escape are left out.
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
 jumpTries
 </td>
 <td style="text-align:left;">
@@ -3435,7 +3472,7 @@ ignitionsAndEscapes
 data.table
 </td>
 <td style="text-align:left;">
-This year’s ignitions, one row per ignited pixel, in random order: <code>pixelID</code> (cell index of <code>flammableRTM</code>), <code>igProb</code>, <code>ignitions</code>, <code>escapeProb</code>, <code>escapes</code> of the coarse pixel it was drawn from, and <code>escaped</code>, whether this ignition escaped: exactly <code>escapes</code> of a coarse pixel’s rows are TRUE. Drawn each year from <code>fireSense_IgAndEscapeProbRas</code>; without that raster a supplied <code>ignitionsAndEscapes</code> is used as it is.
+This year’s ignitions, one row per ignited pixel, in random order: <code>pixelID</code> (cell index of <code>flammableRTM</code>), <code>igProb</code>, <code>ignitions</code>, <code>escapeProb</code>, <code>escapes</code> of the coarse pixel it was drawn from, and <code>escaped</code>, whether this ignition escaped: exactly <code>escapes</code> of a coarse pixel’s rows are TRUE. Drawn each year from <code>fireSense_IgAndEscapeProbRas</code>; without that raster a supplied <code>ignitionsAndEscapes</code> is used as it is. With <code>ignitionSource = &quot;observedEscapes&quot;</code>: the year’s observed escapes, with only <code>pixelID</code> and <code>escaped</code> (all TRUE).
 </td>
 </tr>
 <tr>
