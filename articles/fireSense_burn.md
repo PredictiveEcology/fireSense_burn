@@ -1,7 +1,7 @@
 ---
 title: "fireSense_burn Manual"
 subtitle: "v.0.0.0.9000"
-date: "Last updated: 2026-10-23"
+date: "Last updated: 2026-10-26"
 output:
   bookdown::html_document2:
     toc: true
@@ -97,6 +97,12 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
+   <td style="text-align:left;"> ignitionFirePoints </td>
+   <td style="text-align:left;"> SpatVector </td>
+   <td style="text-align:left;"> Only with `ignitionSource = "observedEscapes"`: observed fire points with columns `YEAR` and `SIZE_HA`, in the CRS of `rasterToMatch` (from fireSense_dataPrepFit: the NFDB natural-cause points). </td>
+   <td style="text-align:left;"> NA </td>
+  </tr>
+  <tr>
    <td style="text-align:left;"> ignitionFitRTM </td>
    <td style="text-align:left;"> SpatRaster </td>
    <td style="text-align:left;"> The coarse raster the ignition and escape models were fitted on (from fireSense_dataPrepFit). </td>
@@ -189,6 +195,15 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn)
    <td style="text-align:left;"> TRUE </td>
   </tr>
   <tr>
+   <td style="text-align:left;"> ignitionSource </td>
+   <td style="text-align:left;"> character </td>
+   <td style="text-align:left;"> predicted </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> Where each year's fires start. `"predicted"`: ignitions and escapes are drawn from `fireSense_IgAndEscapeProbRas`. `"observedEscapes"` (for hindcasts that test spread alone): the year's observed escapes in `ignitionFirePoints` (fires of at least `escapeSizeHa` and larger than a pixel, of year `floor(time(sim))`) are spread from the pixels of their points, and nothing is drawn from the predicted surfaces. Observed fires that did not escape are left out. </td>
+   <td style="text-align:left;"> TRUE </td>
+  </tr>
+  <tr>
    <td style="text-align:left;"> jumpTries </td>
    <td style="text-align:left;"> integer </td>
    <td style="text-align:left;"> 20 </td>
@@ -249,7 +264,7 @@ Description of the module outputs (Table \@ref(tab:moduleOutputs-fireSense_burn)
   <tr>
    <td style="text-align:left;"> ignitionsAndEscapes </td>
    <td style="text-align:left;"> data.table </td>
-   <td style="text-align:left;"> This year's ignitions, one row per ignited pixel, in random order: `pixelID` (cell index of `flammableRTM`), `igProb`, `ignitions`, `escapeProb`, `escapes` of the coarse pixel it was drawn from, and `escaped`, whether this ignition escaped: exactly `escapes` of a coarse pixel's rows are TRUE. Drawn each year from `fireSense_IgAndEscapeProbRas`; without that raster a supplied `ignitionsAndEscapes` is used as it is. </td>
+   <td style="text-align:left;"> This year's ignitions, one row per ignited pixel, in random order: `pixelID` (cell index of `flammableRTM`), `igProb`, `ignitions`, `escapeProb`, `escapes` of the coarse pixel it was drawn from, and `escaped`, whether this ignition escaped: exactly `escapes` of a coarse pixel's rows are TRUE. Drawn each year from `fireSense_IgAndEscapeProbRas`; without that raster a supplied `ignitionsAndEscapes` is used as it is. With `ignitionSource = "observedEscapes"`: the year's observed escapes, with only `pixelID` and `escaped` (all TRUE). </td>
   </tr>
   <tr>
    <td style="text-align:left;"> burnDT </td>
