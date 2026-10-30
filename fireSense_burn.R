@@ -294,16 +294,45 @@ burn <- function(sim) {
 #' @return An integer vector of counts, one per `mean`.
 drawCounts <- function(objective, mean, what) {
   mean[is.na(mean)] <- 0
+  checkDrawable(objective, what)
+  stats::rpois(length(mean), lambda = mean)
+}
+
+## Stops unless `objective` is the one family that can be drawn from (see `drawCounts()`).
+checkDrawable <- function(objective, what) {
   if (!identical(objective, fireSenseUtils::ignitionObjectiveTxt))
     stop("fireSense_burn: cannot draw ", what, "s from objective '", objective, "'; only '",
          fireSenseUtils::ignitionObjectiveTxt, "' is supported")
-  stats::rpois(length(mean), lambda = mean)
+}
+
+#' Draw the escapes of ignited coarse pixels
+#'
+#' The escape model is fitted on ignited pixel-years only, so its mean `escapeMean` is the expected escapes of a
+#' pixel that has at least one ignition. Each ignition escapes with probability
+#' `q = escapeMean * (1 - exp(-ignitionMean)) / ignitionMean`, capped at 1, and a pixel's escapes are binomial over
+#' its `ignitions`. For Poisson ignitions `(1 - exp(-ignitionMean)) / ignitionMean` is `1 / E[ignitions | ignitions > 0]`,
+#' so the expected escapes of an ignited pixel are `escapeMean` (more ignitions, more escapes) and never exceed the
+#' ignitions. Drawing `rpois(escapeMean)` and truncating it at the ignitions would lower the mean.
+#'
+#' @param objective The escape model objective, from `fireSense_IgAndEscapeDistribution$escape`.
+#' @param escapeMean Numeric vector of expected escapes of an ignited pixel; `NA` is 0.
+#' @param ignitionMean Numeric vector, the mean the pixel's ignitions were drawn from (after the year effect).
+#' @param ignitions Integer vector of the pixel's ignitions, each at least 1.
+#' @param what `"escape"`, for the error message.
+#'
+#' @return An integer vector of escapes, one per `ignitions`.
+drawEscapes <- function(objective, escapeMean, ignitionMean, ignitions, what) {
+  checkDrawable(objective, what)
+  escapeMean[is.na(escapeMean)] <- 0
+  q <- pmin(1, escapeMean * (-expm1(-ignitionMean)) / ignitionMean)
+  stats::rbinom(length(ignitions), size = ignitions, prob = q)
 }
 
 #' Draw this year's ignitions and escapes
 #'
 #' Draws ignitions per coarse pixel from `fireSense_IgAndEscapeDistribution$ignition` with mean `ignitionProb`;
-#' for coarse pixels with ignitions, draws escapes from `$escape` with mean `escapeProb`, at most one per ignition.
+#' for coarse pixels with ignitions, draws escapes from `$escape` with mean `escapeProb`, at most one per ignition
+#' (`drawEscapes()`: binomial over the ignitions, so an ignited pixel has `escapeProb` escapes on average).
 #' With `z`, both means are first multiplied by the year effect (`fireSenseUtils::yearEffectMultiplier()` with
 #' the `ignitionYearSD` and `escapeYearSD` layers), each with its own z and its own sd: a year with a high
 #' ignition z does not have a high escape z, nor more spread (spread has its own z, `yearSpreadProb()`).
@@ -335,8 +364,7 @@ drawIgnitionsAndEscapes <- function(sim, store, z = NULL) {
   coarse <- coarse[!is.na(coarse$igProb), ]
   igns <- drawCounts(dist$ignition, coarse$igProb, "ignition")
   whHasIgns <- which(igns > 0)
-  ## no more escapes than ignitions
-  escs <- pmin(drawCounts(dist$escape, coarse$escapeProb[whHasIgns], "escape"), igns[whHasIgns])
+  escs <- drawEscapes(dist$escape, coarse$escapeProb[whHasIgns], coarse$igProb[whHasIgns], igns[whHasIgns], "escape")
   set(coarse, NULL, c("ignitions", "escapes"), list(igns, NA_integer_))
   set(coarse, whHasIgns, "escapes", escs)
 
