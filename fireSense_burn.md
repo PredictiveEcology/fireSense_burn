@@ -40,7 +40,7 @@ A landscape fire model sensitive to environmental changes (e.g., weather and lan
 ### Module summary
 
 Each year, `fireSense_burn` spreads fires from the pixels where fires escaped, using `SpaDES.tools::spread2()` with the per-pixel spread probabilities in `fireSense_SpreadPredicted`.
-Ignitions and escapes are drawn here, each year, from the expected counts `fireSense_ignitionPredict` predicts (`fireSense_IgAndEscapeProbRas`), using the objective of the fitted models (`fireSense_IgAndEscapeDistribution`, only `count:poisson`); escapes are capped at the ignitions. The result is `ignitionsAndEscapes`.
+Ignitions and escapes are drawn here, each year, from the expected counts `fireSense_ignitionPredict` predicts (`fireSense_IgAndEscapeProbRas`), using the objective of the fitted models (`fireSense_IgAndEscapeDistribution`, only `count:poisson`); each ignition escapes with a probability that keeps the mean escapes of an ignited pixel at the predicted `escapeProb`, so escapes never exceed ignitions. The result is `ignitionsAndEscapes`.
 The module records the pixels burned that year, a cumulative burn map, and a per-fire summary of area burned.
 
 ### Module inputs and parameters
