@@ -4,9 +4,9 @@ year's fires. Here each year draws z ~ N(0, 1), independent of
 the ignitions' and escapes' z (yearZ()), and uses eps = z * sd. With a raster sd (several ELFs, each with
 its own fitted sd) the ELFs share the year's z, each scaled by its own sd. Without powerLaw eps is added on the
 logit: plogis(qlogis(p) + eps). With powerLaw (a fit with spreadLink = &quot;powerLaw&quot;) eps is added to the linear
-predictor x, as in the fit: x is recovered from p (p = pc - (pc - floor) * exp(-x / gamma)) and mapped forward
-again by fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor). Pixels with p of 0 (not burnable) or at or above
-pc (no x) keep their p."><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
+predictor x, as in the fit: p is fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor) for every pixel with an
+x (linear). A flammable pixel with a low x has p of 0 in spreadProbRas (the link clips it), so x cannot be
+recovered from p, and linear is required. Pixels without an x (not flammable) keep their p."><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
 <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
 <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
 <![endif]--></head><body data-spy="scroll" data-target="#toc">
@@ -65,13 +65,13 @@ year's fires. Here each year draws z ~ N(0, 1), independent of
 the ignitions' and escapes' z (<code><a href="yearZ.html">yearZ()</a></code>), and uses eps = z * sd. With a raster <code>sd</code> (several ELFs, each with
 its own fitted sd) the ELFs share the year's z, each scaled by its own sd. Without <code>powerLaw</code> eps is added on the
 logit: plogis(qlogis(p) + eps). With <code>powerLaw</code> (a fit with <code>spreadLink = "powerLaw"</code>) eps is added to the linear
-predictor x, as in the fit: x is recovered from p (<code>p = pc - (pc - floor) * exp(-x / gamma)</code>) and mapped forward
-again by <code>fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor)</code>. Pixels with p of 0 (not burnable) or at or above
-<code>pc</code> (no x) keep their p.</p>
+predictor x, as in the fit: p is <code>fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor)</code> for every pixel with an
+x (<code>linear</code>). A flammable pixel with a low x has p of 0 in <code>spreadProbRas</code> (the link clips it), so x cannot be
+recovered from p, and <code>linear</code> is required. Pixels without an x (not flammable) keep their p.</p>
     </div>
 
     <div id="ref-usage">
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">yearSpreadProb</span><span class="op">(</span><span class="va">spreadProbRas</span>, <span class="va">sd</span>, powerLaw <span class="op">=</span> <span class="cn">NULL</span>, z <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">yearSpreadProb</span><span class="op">(</span><span class="va">spreadProbRas</span>, <span class="va">sd</span>, powerLaw <span class="op">=</span> <span class="cn">NULL</span>, z <span class="op">=</span> <span class="cn">NULL</span>, linear <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div id="arguments">
@@ -93,6 +93,11 @@ again by <code>fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor)</code>. P
 
 <dt id="arg-z">z<a class="anchor" aria-label="anchor" href="#arg-z"></a></dt>
 <dd><p>The year's z; <code>NULL</code> (what <code>burn</code> passes) draws one here.</p></dd>
+
+
+<dt id="arg-linear">linear<a class="anchor" aria-label="anchor" href="#arg-linear"></a></dt>
+<dd><p><code>fireSense_SpreadLinear</code>: the linear predictor x, a <code>SpatRaster</code> aligned with <code>spreadProbRas</code>; required
+with <code>powerLaw</code> (and an <code>sd</code> above 0), else the function stops.</p></dd>
 
 </dl></div>
     <div id="value">

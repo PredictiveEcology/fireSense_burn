@@ -73,7 +73,7 @@
       <h1 data-toc-skip>fireSense_burn Manual</h1>
             <h3 data-toc-skip class="subtitle">v.0.0.0.9000</h3>
             
-            <h4 data-toc-skip class="date">Last updated: 2026-10-26</h4>
+            <h4 data-toc-skip class="date">Last updated: 2026-10-30</h4>
       
 
       <div class="hidden name"><code>fireSense_burn.Rmd</code></div>
@@ -165,7 +165,21 @@ fireSense_SpreadPowerLaw
 SpatRaster&amp;#124;numeric
 </td>
 <td style="text-align:left;">
-From fireSense_spreadPredict, only for a fit made with <code>spreadLink = "powerLaw"</code>: <code>pc</code>, <code>gamma</code> and <code>floor</code> of <code><a href="https://rdrr.io/pkg/fireSenseUtils/man/powerLawLink.html" class="external-link">fireSenseUtils::powerLawLink()</a></code>, as a numeric vector with these names (one ELF) or a 3-layer raster aligned with <code>fireSense_SpreadPredicted</code>. The year effect is then added to the linear predictor x, as in the fit: p = powerLawLink(x + z sd), with x recovered from p. NULL: the effect is added on the logit.
+From fireSense_spreadPredict, only for a fit made with <code>spreadLink = "powerLaw"</code>: <code>pc</code>, <code>gamma</code> and <code>floor</code> of <code><a href="https://rdrr.io/pkg/fireSenseUtils/man/powerLawLink.html" class="external-link">fireSenseUtils::powerLawLink()</a></code>, as a numeric vector with these names (one ELF) or a 3-layer raster aligned with <code>fireSense_SpreadPredicted</code>. The year effect is then added to the linear predictor x, as in the fit: p = powerLawLink(x + z sd), with x from <code>fireSense_SpreadLinear</code>. NULL: the effect is added on the logit.
+</td>
+<td style="text-align:left;">
+NA
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+fireSense_SpreadLinear
+</td>
+<td style="text-align:left;">
+SpatRaster
+</td>
+<td style="text-align:left;">
+From fireSense_spreadPredict, only for a fit made with <code>spreadLink = "powerLaw"</code>: the linear predictor x of each flammable pixel, aligned with <code>fireSense_SpreadPredicted</code>. Required whenever <code>fireSense_SpreadPowerLaw</code> is set and the year effect is above 0: the link clips a pixel with a low x to p = 0, so x cannot be recovered from p, yet the fit adds the year effect to x of every pixel.
 </td>
 <td style="text-align:left;">
 NA
