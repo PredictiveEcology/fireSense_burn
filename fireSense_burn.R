@@ -67,8 +67,13 @@ defineModule(sim, list(
                  paste("From fireSense_spreadPredict, only for a fit made with `spreadLink = \"powerLaw\"`: `pc`, `gamma` and",
                        "`floor` of `fireSenseUtils::powerLawLink()`, as a numeric vector with these names (one ELF) or a",
                        "3-layer raster aligned with `fireSense_SpreadPredicted`. The year effect is then added to the linear",
-                       "predictor x, as in the fit: p = powerLawLink(x + z * sd), with x recovered from p. NULL: the effect",
-                       "is added on the logit.")),
+                       "predictor x, as in the fit: p = powerLawLink(x + z * sd), with x from `fireSense_SpreadLinear`.",
+                       "NULL: the effect is added on the logit.")),
+    expectsInput("fireSense_SpreadLinear", "SpatRaster",
+                 paste("From fireSense_spreadPredict, only for a fit made with `spreadLink = \"powerLaw\"`: the linear",
+                       "predictor x of each flammable pixel, aligned with `fireSense_SpreadPredicted`. Required whenever",
+                       "`fireSense_SpreadPowerLaw` is set and the year effect is above 0: the link clips a pixel with a low x",
+                       "to p = 0, so x cannot be recovered from p, yet the fit adds the year effect to x of every pixel.")),
     expectsInput("flammableRTM", "SpatRaster", 
                  "Binary SpatRaster (1 = flammable, 0 = not). Non-flammable pixels are `NA` in `burnMap`."),
     expectsInput("fireSense_IgAndEscapeProbRas", "SpatRaster",
@@ -228,7 +233,8 @@ burn <- function(sim) {
          "on each of that pixel's ignitions, so it cannot say which fires to spread.")
 
   ## this year's spread probability, with the year's random effect if the fit has one
-  spreadProbYear <- yearSpreadProb(sim$fireSense_SpreadPredicted, sim$fireSense_SpreadSD, sim$fireSense_SpreadPowerLaw)
+  spreadProbYear <- yearSpreadProb(sim$fireSense_SpreadPredicted, sim$fireSense_SpreadSD, sim$fireSense_SpreadPowerLaw,
+                                 linear = sim$fireSense_SpreadLinear)
 
   ## One fire per escaped ignition, spread with spreadCpp(), the spread the fit uses (fireSenseUtils'
   ## objective), so a forecast spreads fires as the fitted parameters assume: an escaped fire burns its
@@ -437,17 +443,19 @@ yearSDLayer <- function(probRas, layer) {
 #' the ignitions' and escapes' z (`yearZ()`), and uses eps = z * sd. With a raster `sd` (several ELFs, each with
 #' its own fitted sd) the ELFs share the year's z, each scaled by its own sd. Without `powerLaw` eps is added on the
 #' logit: plogis(qlogis(p) + eps). With `powerLaw` (a fit with `spreadLink = "powerLaw"`) eps is added to the linear
-#' predictor x, as in the fit: x is recovered from p (`p = pc - (pc - floor) * exp(-x / gamma)`) and mapped forward
-#' again by `fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor)`. Pixels with p of 0 (not burnable) or at or above
-#' `pc` (no x) keep their p.
+#' predictor x, as in the fit: p is `fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor)` for every pixel with an
+#' x (`linear`). A flammable pixel with a low x has p of 0 in `spreadProbRas` (the link clips it), so x cannot be
+#' recovered from p, and `linear` is required. Pixels without an x (not flammable) keep their p.
 #'
 #' @param spreadProbRas `SpatRaster` of spread probability.
 #' @param sd `NULL`, one number, or a `SpatRaster` aligned with `spreadProbRas`.
 #' @param powerLaw `NULL` (logit), or `fireSense_SpreadPowerLaw`: a numeric vector or 3-layer `SpatRaster` with
 #'   `pc`, `gamma` and `floor`.
+#' @param linear `fireSense_SpreadLinear`: the linear predictor x, a `SpatRaster` aligned with `spreadProbRas`; required
+#'   with `powerLaw` (and an `sd` above 0), else the function stops.
 #' @param z The year's z; `NULL` (what `burn` passes) draws one here.
 #' @return Numeric vector of spread probability, one per pixel.
-yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL) {
+yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL, linear = NULL) {
   p <- terra::values(spreadProbRas, mat = FALSE)
   if (is.null(sd)) return(p)
   s <- if (inherits(sd, "SpatRaster")) terra::values(sd, mat = FALSE) else rep_len(sd, length(p))
@@ -456,13 +464,19 @@ yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL) {
   if (is.null(z)) z <- stats::rnorm(1)
   if (is.null(powerLaw)) return(stats::plogis(stats::qlogis(p) + z * s))
 
+  if (is.null(linear))
+    stop("fireSense_burn: a power-law spread fit (fireSense_SpreadPowerLaw) with a year effect needs ",
+         "fireSense_SpreadLinear, the linear predictor from fireSense_spreadPredict (>= its PR 33). The year ",
+         "effect cannot be added to x recovered from fireSense_SpreadPredicted: the link clips low x to p = 0.",
+         call. = FALSE)
+  x <- terra::values(linear, mat = FALSE)
+
   ## a parameter per pixel: a raster's layer, or one number for all
   par1 <- function(nm) if (inherits(powerLaw, "SpatRaster")) terra::values(powerLaw[[nm]], mat = FALSE)
                        else rep_len(powerLaw[[nm]], length(p))
   pc <- par1("pc"); gamma <- par1("gamma"); flr <- par1("floor")
-  ok <- !is.na(p) & !is.na(gamma) & p > 0 & p < pc
-  x <- -gamma[ok] * log((pc[ok] - p[ok]) / (pc[ok] - flr[ok]))
-  p[ok] <- fireSenseUtils::powerLawLink(x + z * s[ok], pc[ok], gamma[ok], flr[ok])
+  ok <- !is.na(x) & !is.na(pc) & !is.na(gamma) & !is.na(flr)
+  p[ok] <- fireSenseUtils::powerLawLink(x[ok] + z * s[ok], pc[ok], gamma[ok], flr[ok])
   p
 }
 

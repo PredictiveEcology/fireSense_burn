@@ -18,6 +18,7 @@ test_that("inputs are the expected names and classes", {
     inputs[order(names(inputs))],
     c(fireSense_IgAndEscapeDistribution = "list",
       fireSense_IgAndEscapeProbRas      = "SpatRaster",
+      fireSense_SpreadLinear            = "SpatRaster",
       fireSense_SpreadPowerLaw          = "SpatRaster|numeric",
       fireSense_SpreadPredicted         = "SpatRaster",
       fireSense_SpreadSD                = "SpatRaster|numeric",
