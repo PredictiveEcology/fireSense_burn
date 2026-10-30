@@ -32,7 +32,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">fireSense_burn</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9010</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9011</span>
       </span>
     </div>
 
@@ -103,7 +103,7 @@
 <h4 id="module-summary">Module summary<a class="anchor" aria-label="anchor" href="#module-summary"></a>
 </h4>
 <p>Each year, <code>fireSense_burn</code> spreads fires from the pixels where fires escaped, using <code><a href="https://spades-tools.predictiveecology.org/reference/spread2.html" class="external-link">SpaDES.tools::spread2()</a></code> with the per-pixel spread probabilities in <code>fireSense_SpreadPredicted</code>.
-Ignitions and escapes are drawn here, each year, from the expected counts <code>fireSense_ignitionPredict</code> predicts (<code>fireSense_IgAndEscapeProbRas</code>), using the objective of the fitted models (<code>fireSense_IgAndEscapeDistribution</code>, only <code>count:poisson</code>); escapes are capped at the ignitions. The result is <code>ignitionsAndEscapes</code>.
+Ignitions and escapes are drawn here, each year, from the expected counts <code>fireSense_ignitionPredict</code> predicts (<code>fireSense_IgAndEscapeProbRas</code>), using the objective of the fitted models (<code>fireSense_IgAndEscapeDistribution</code>, only <code>count:poisson</code>); each ignition escapes with a probability that keeps the mean escapes of an ignited pixel at the predicted <code>escapeProb</code>, so escapes never exceed ignitions. The result is <code>ignitionsAndEscapes</code>.
 The module records the pixels burned that year, a cumulative burn map, and a per-fire summary of area burned.</p>
 </div>
 <div class="section level4">
