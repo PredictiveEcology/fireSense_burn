@@ -220,34 +220,64 @@ test_that("an sd raster scales the year's shared draw per pixel (several ELFs)",
 
 ## ---- the year effect of a "powerLaw" fit is added to the linear predictor x, not to the logit of p ----
 
+## the toy fit: x per pixel (fireSense_SpreadLinear), p = powerLawLink(x) (fireSense_SpreadPredicted)
+toyPowerLaw <- function(x = c(-3, 0.5, 1, 2.5), pc = 0.25, gamma = 1.9, flr = 0.13) {
+  link <- function(x) fireSenseUtils::powerLawLink(x, pc, gamma, flr)
+  lin <- toySpreadProb(p = 1); lin[seq_along(x)] <- x      # x of the other pixels: 1
+  sp <- lin; terra::values(sp) <- link(as.vector(terra::values(lin)))
+  list(sp = sp, lin = lin, link = link, pl = c(pc = pc, gamma = gamma, floor = flr), x = x)
+}
+
 test_that("with a powerLaw link a year effect of eps changes p exactly as powerLawLink(x + eps) does", {
-  pc <- 0.25; gamma <- 1.9; flr <- 0.13
-  x <- c(0.5, 1, 2.5, 4)
-  p <- fireSenseUtils::powerLawLink(x, pc, gamma, flr)
-  sp <- toySpreadProb(p = 0.3); sp[1:4] <- p
-  pl <- c(pc = pc, gamma = gamma, floor = flr)
+  t <- toyPowerLaw()
   set.seed(3); eps <- 0.6 * stats::rnorm(1)
   set.seed(3)
-  q <- yearSpreadProb(sp, 0.6, powerLaw = pl)
-  expect_equal(q[1:4], fireSenseUtils::powerLawLink(x + eps, pc, gamma, flr), tolerance = 1e-12)
+  q <- yearSpreadProb(t$sp, 0.6, powerLaw = t$pl, linear = t$lin)
+  expect_equal(q[1:4], t$link(t$x + eps), tolerance = 1e-12)
+  expect_equal(q, t$link(as.vector(terra::values(t$lin)) + eps), tolerance = 1e-12)
   ## not what the logit would give
   set.seed(3)
-  expect_false(isTRUE(all.equal(q[1:4], yearSpreadProb(sp, 0.6)[1:4])))
-  ## no year effect: p as it is; p = 0 (not burnable) stays 0
-  expect_equal(yearSpreadProb(sp, 0, powerLaw = pl), as.vector(terra::values(sp)), tolerance = 1e-12)
-  sp0 <- sp; sp0[1] <- 0
-  set.seed(3)
-  expect_identical(yearSpreadProb(sp0, 0.6, powerLaw = pl)[1], 0)
+  expect_false(isTRUE(all.equal(q[1:4], yearSpreadProb(t$sp, 0.6)[1:4])))
+  ## no year effect: p as it is
+  expect_equal(yearSpreadProb(t$sp, 0, powerLaw = t$pl, linear = t$lin), as.vector(terra::values(t$sp)),
+               tolerance = 1e-12)
+  expect_equal(yearSpreadProb(t$sp, 0.6, powerLaw = t$pl, linear = t$lin, z = 0), as.vector(terra::values(t$sp)),
+               tolerance = 1e-12)
+})
+
+test_that("a flammable pixel whose x gives p = 0 gets the year effect too", {
+  t <- toyPowerLaw(x = c(-3, -2, 0.5, 1))                # the link clips x = -3 and -2 to p = 0
+  expect_equal(as.vector(terra::values(t$sp))[1:2], c(0, 0))
+  z <- 2.5
+  q <- yearSpreadProb(t$sp, 0.8, powerLaw = t$pl, linear = t$lin, z = z)
+  expect_equal(q, t$link(as.vector(terra::values(t$lin)) + z * 0.8), tolerance = 1e-12)
+  ## a wet year with a large effect: x = -3 + 6 is above 0
+  q2 <- yearSpreadProb(t$sp, 2, powerLaw = t$pl, linear = t$lin, z = 3)
+  expect_gt(q2[1], 0.13)
+  expect_equal(q2[1], t$link(-3 + 6), tolerance = 1e-12)
+  ## a negative z cannot make p negative
+  expect_true(all(yearSpreadProb(t$sp, 0.8, powerLaw = t$pl, linear = t$lin, z = -3) >= 0))
+})
+
+test_that("pixels without x (NA) keep their p; a powerLaw fit without fireSense_SpreadLinear stops", {
+  t <- toyPowerLaw()
+  lin <- t$lin; lin[2] <- NA
+  q <- yearSpreadProb(t$sp, 0.6, powerLaw = t$pl, linear = lin, z = 1)
+  expect_identical(q[2], as.vector(terra::values(t$sp))[2])
+  expect_error(yearSpreadProb(t$sp, 0.6, powerLaw = t$pl, z = 1), "fireSense_SpreadLinear")
+  ## no year effect needs no x
+  expect_equal(yearSpreadProb(t$sp, 0, powerLaw = t$pl), as.vector(terra::values(t$sp)))
 })
 
 test_that("powerLaw parameters can be rasters (several ELFs) and the ceiling output is unchanged", {
-  sp <- toySpreadProb(p = 0.2)
-  plR <- c(sp, sp, sp); names(plR) <- c("pc", "gamma", "floor")
+  t <- toyPowerLaw()
+  plR <- c(t$sp, t$sp, t$sp); names(plR) <- c("pc", "gamma", "floor")
   plR$pc <- 0.25; plR$gamma <- 1.9; plR$floor <- 0.13
-  set.seed(8); a <- yearSpreadProb(sp, 0.5, powerLaw = plR)
-  set.seed(8); b <- yearSpreadProb(sp, 0.5, powerLaw = c(pc = 0.25, gamma = 1.9, floor = 0.13))
+  set.seed(8); a <- yearSpreadProb(t$sp, 0.5, powerLaw = plR, linear = t$lin)
+  set.seed(8); b <- yearSpreadProb(t$sp, 0.5, powerLaw = t$pl, linear = t$lin)
   expect_equal(a, b, tolerance = 1e-12)
   ## NULL power-law parameters: the logit path, bit-identical to before
+  sp <- toySpreadProb(p = 0.2)
   set.seed(8); z <- stats::rnorm(1)
   expect_identical(
     { set.seed(8); yearSpreadProb(sp, 0.5, powerLaw = NULL) },
@@ -338,8 +368,8 @@ test_that("spread draws its own z: it is independent of the z behind the ignitio
   realZ <- mods$yearZ
   realSpread <- mods$yearSpreadProb
   mods$yearZ <- function(probRas) { z <- realZ(probRas); zIg <<- c(zIg, z[["ignition"]]); z }
-  mods$yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL) {
-    q <- realSpread(spreadProbRas, sd, powerLaw, z)
+  mods$yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL, linear = NULL) {
+    q <- realSpread(spreadProbRas, sd, powerLaw, z, linear)
     zPairs <<- c(zPairs, zIg[length(zIg)], (stats::qlogis(q[1]) - stats::qlogis(p)) / sd)
     q
   }
