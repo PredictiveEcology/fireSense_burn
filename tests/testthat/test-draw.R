@@ -216,7 +216,7 @@ test_that("the year effect keeps the mean ignitions and escapes over many years"
     c(ignitions = nrow(ig), escapes = sum(ig$escaped), ignitedPixels = length(unique(coarseOf(ig$pixelID))))
   })
   expect_equal(mean(counts["ignitions", ]), 8, tolerance = 0.1)                        # 4 pixels x 2
-  ## 0.2 expected escapes per ignited pixel (the cap at the ignitions seldom binds)
+  ## 0.2 expected escapes per ignited pixel
   expect_equal(sum(counts["escapes", ]) / sum(counts["ignitedPixels", ]), 0.2, tolerance = 0.15)
   ## but the years differ more than Poisson years would (variance = mean): 8 + 64 * (exp(0.25) - 1) = 26
   expect_gt(stats::var(counts["ignitions", ]), 2 * 8)
@@ -243,12 +243,61 @@ test_that("with a year effect in both models the mean escapes are those of indep
   expected <- function(zEscape) {
     n <- 2e5
     zIg <- stats::rnorm(n)
-    ig <- stats::rpois(n, igMean * fireSenseUtils::yearEffectMultiplier(sd, zIg))
-    mean(pmin(stats::rpois(n, escMean * fireSenseUtils::yearEffectMultiplier(sd, zEscape(zIg, n))), ig))
+    lambda <- igMean * fireSenseUtils::yearEffectMultiplier(sd, zIg)
+    ig <- stats::rpois(n, lambda)
+    mean(drawEscapes("count:poisson", escMean * fireSenseUtils::yearEffectMultiplier(sd, zEscape(zIg, n)),
+                       lambda, ig, "escape"))
   }
   indep <- 4 * expected(function(zIg, n) stats::rnorm(n))
   shared <- 4 * expected(function(zIg, n) zIg)
   se <- stats::sd(esc) / sqrt(length(esc))
   expect_gt(shared - indep, 6 * se)                  # the test can tell them apart
   expect_lt(abs(mean(esc) - indep), 4 * se)
+})
+
+## ---- escapes: the escape fit's mean m is per ignited cell, so E[escapes | ignited cell] = m ----
+
+## Many ignited cells at ignition mean `lambda` and escape mean `m`, drawn as drawIgnitionsAndEscapes() does
+drawIgnited <- function(lambda, m, n = 2e5) {
+  igns <- stats::rpois(n, lambda)
+  igns <- igns[igns > 0]
+  list(igns = igns,
+       escs = drawEscapes("count:poisson", m, rep(lambda, length(igns)), igns, "escape"))
+}
+
+test_that("escapes average the escape fit's mean over ignited cells, whatever the ignition mean", {
+  for (case in list(c(0.3, 0.5), c(0.05, 0.2), c(2.5, 0.5), c(8, 0.7))) {
+    set.seed(11)
+    d <- drawIgnited(case[1], case[2])
+    ## sd of an escape count is below sqrt(m + m^2); allow 5 standard errors
+    expect_lt(abs(mean(d$escs) - case[2]), 5 * sqrt(case[2] + case[2]^2) / sqrt(length(d$escs)))
+    expect_true(all(d$escs <= d$igns))
+  }
+})
+
+test_that("cells with more ignitions escape more", {
+  set.seed(12)
+  d <- drawIgnited(1, 0.5)
+  expect_gt(mean(d$escs[d$igns == 2]), mean(d$escs[d$igns == 1]))
+  expect_gt(mean(d$escs[d$igns == 3]), mean(d$escs[d$igns == 2]))
+})
+
+test_that("a per-ignition escape probability above 1 is capped at 1: every ignition escapes", {
+  set.seed(13)
+  expect_identical(drawEscapes("count:poisson", 50, rep(0.1, 20), rep(2L, 20), "escape"), rep(2L, 20))
+})
+
+test_that("an unsupported escape objective stops in drawEscapes", {
+  expect_error(drawEscapes("reg:tweedie", 1, 1, 1L, "escape"), "cannot draw escapes from objective 'reg:tweedie'")
+})
+
+test_that("drawIgnitionsAndEscapes: escapes per ignited coarse cell average escapeProb", {
+  ## low ignition mean, where truncating a Poisson draw at the ignitions lost about a third of the escapes
+  set.seed(14)
+  sim <- toyDrawSim(rep(0.1, 4), rep(1, 4))
+  escs <- unlist(lapply(1:1500, function(i) {
+    ig <- draw(sim)
+    unique(ig[, .(coarse = coarseOf(pixelID), escapes)])$escapes
+  }))
+  expect_lt(abs(mean(escs) - 1), 4 * stats::sd(escs) / sqrt(length(escs)))
 })
