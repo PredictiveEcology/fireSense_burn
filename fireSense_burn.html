@@ -2973,7 +2973,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">fireSense_burn Manual</h1>
 <h3 class="subtitle">v.0.0.0.9000</h3>
-<h4 class="date">Last updated: 2026-10-30</h4>
+<h4 class="date">Last updated: 2026-11-02</h4>
 
 </div>
 
@@ -3058,7 +3058,7 @@ fireSense_SpreadPowerLaw
 SpatRaster&amp;#124;numeric
 </td>
 <td style="text-align:left;">
-From fireSense_spreadPredict, only for a fit made with <code>spreadLink = &quot;powerLaw&quot;</code>: <code>pc</code>, <code>gamma</code> and <code>floor</code> of <code>fireSenseUtils::powerLawLink()</code>, as a numeric vector with these names (one ELF) or a 3-layer raster aligned with <code>fireSense_SpreadPredicted</code>. The year effect is then added to the linear predictor x, as in the fit: p = powerLawLink(x + z sd), with x from <code>fireSense_SpreadLinear</code>. NULL: the effect is added on the logit.
+From fireSense_spreadPredict, only for a fit made with <code>spreadLink = &quot;powerLaw&quot;</code>: <code>pc</code>, <code>gamma</code> and <code>floor</code> (and <code>shape</code>, 1 if absent) of <code>fireSenseUtils::powerLawLink()</code>, as a numeric vector with these names (one ELF) or a raster aligned with <code>fireSense_SpreadPredicted</code>. The year effect is then added to the linear predictor x, as in the fit: p = powerLawLink(x + z sd), with x from <code>fireSense_SpreadLinear</code>. NULL: the effect is added on the logit.
 </td>
 <td style="text-align:left;">
 NA
