@@ -4,7 +4,7 @@ year's fires. Here each year draws z ~ N(0, 1), independent of
 the ignitions' and escapes' z (yearZ()), and uses eps = z * sd. With a raster sd (several ELFs, each with
 its own fitted sd) the ELFs share the year's z, each scaled by its own sd. Without powerLaw eps is added on the
 logit: plogis(qlogis(p) + eps). With powerLaw (a fit with spreadLink = &quot;powerLaw&quot;) eps is added to the linear
-predictor x, as in the fit: p is fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor) for every pixel with an
+predictor x, as in the fit: p is fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor, shape) for every pixel with an
 x (linear). A flammable pixel with a low x has p of 0 in spreadProbRas (the link clips it), so x cannot be
 recovered from p, and linear is required. Pixels without an x (not flammable) keep their p."><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
 <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
@@ -65,7 +65,7 @@ year's fires. Here each year draws z ~ N(0, 1), independent of
 the ignitions' and escapes' z (<code><a href="yearZ.html">yearZ()</a></code>), and uses eps = z * sd. With a raster <code>sd</code> (several ELFs, each with
 its own fitted sd) the ELFs share the year's z, each scaled by its own sd. Without <code>powerLaw</code> eps is added on the
 logit: plogis(qlogis(p) + eps). With <code>powerLaw</code> (a fit with <code>spreadLink = "powerLaw"</code>) eps is added to the linear
-predictor x, as in the fit: p is <code>fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor)</code> for every pixel with an
+predictor x, as in the fit: p is <code>fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor, shape)</code> for every pixel with an
 x (<code>linear</code>). A flammable pixel with a low x has p of 0 in <code>spreadProbRas</code> (the link clips it), so x cannot be
 recovered from p, and <code>linear</code> is required. Pixels without an x (not flammable) keep their p.</p>
     </div>
@@ -87,8 +87,8 @@ recovered from p, and <code>linear</code> is required. Pixels without an x (not 
 
 
 <dt id="arg-powerlaw">powerLaw<a class="anchor" aria-label="anchor" href="#arg-powerlaw"></a></dt>
-<dd><p><code>NULL</code> (logit), or <code>fireSense_SpreadPowerLaw</code>: a numeric vector or 3-layer <code>SpatRaster</code> with
-<code>pc</code>, <code>gamma</code> and <code>floor</code>.</p></dd>
+<dd><p><code>NULL</code> (logit), or <code>fireSense_SpreadPowerLaw</code>: a numeric vector or <code>SpatRaster</code> with
+<code>pc</code>, <code>gamma</code>, <code>floor</code> and <code>shape</code> (1 when absent).</p></dd>
 
 
 <dt id="arg-z">z<a class="anchor" aria-label="anchor" href="#arg-z"></a></dt>

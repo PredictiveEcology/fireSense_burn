@@ -1,7 +1,7 @@
 ---
 title: "fireSense_burn Manual"
 subtitle: "v.0.0.0.9000"
-date: "Last updated: 2026-10-30"
+date: "Last updated: 2026-11-02"
 output:
   bookdown::html_document2:
     toc: true
@@ -75,7 +75,7 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
   <tr>
    <td style="text-align:left;"> fireSense_SpreadPowerLaw </td>
    <td style="text-align:left;"> SpatRaster&amp;#124;numeric </td>
-   <td style="text-align:left;"> From fireSense_spreadPredict, only for a fit made with `spreadLink = "powerLaw"`: `pc`, `gamma` and `floor` of `fireSenseUtils::powerLawLink()`, as a numeric vector with these names (one ELF) or a 3-layer raster aligned with `fireSense_SpreadPredicted`. The year effect is then added to the linear predictor x, as in the fit: p = powerLawLink(x + z sd), with x from `fireSense_SpreadLinear`. NULL: the effect is added on the logit. </td>
+   <td style="text-align:left;"> From fireSense_spreadPredict, only for a fit made with `spreadLink = "powerLaw"`: `pc`, `gamma` and `floor` (and `shape`, 1 if absent) of `fireSenseUtils::powerLawLink()`, as a numeric vector with these names (one ELF) or a raster aligned with `fireSense_SpreadPredicted`. The year effect is then added to the linear predictor x, as in the fit: p = powerLawLink(x + z sd), with x from `fireSense_SpreadLinear`. NULL: the effect is added on the logit. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
