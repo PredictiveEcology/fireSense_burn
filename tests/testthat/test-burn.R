@@ -245,6 +245,21 @@ test_that("with a powerLaw link a year effect of eps changes p exactly as powerL
                tolerance = 1e-12)
 })
 
+test_that("with a powerLaw shape the year effect goes through the same link; no shape is shape 1", {
+  t <- toyPowerLaw()
+  x2 <- t$x; lin2 <- t$lin
+  sp2 <- lin2; terra::values(sp2) <- fireSenseUtils::powerLawLink(as.vector(terra::values(lin2)), 0.25, 1.9, 0.13, 2)
+  pl2 <- c(t$pl, shape = 2)
+  q <- yearSpreadProb(sp2, 0.6, powerLaw = pl2, linear = lin2, z = 1)
+  expect_equal(q, fireSenseUtils::powerLawLink(as.vector(terra::values(lin2)) + 0.6, 0.25, 1.9, 0.13, 2), tolerance = 1e-12)
+  expect_equal(yearSpreadProb(sp2, 0.6, powerLaw = pl2, linear = lin2, z = 0), as.vector(terra::values(sp2)), tolerance = 1e-12)
+  expect_identical(yearSpreadProb(t$sp, 0.6, powerLaw = c(t$pl, shape = 1), linear = t$lin, z = 1),
+                   yearSpreadProb(t$sp, 0.6, powerLaw = t$pl, linear = t$lin, z = 1))
+  plR <- c(sp2, sp2, sp2, sp2); names(plR) <- c("pc", "gamma", "floor", "shape")
+  plR$pc <- 0.25; plR$gamma <- 1.9; plR$floor <- 0.13; plR$shape <- 2
+  expect_equal(yearSpreadProb(sp2, 0.6, powerLaw = plR, linear = lin2, z = 1), q, tolerance = 1e-12)
+})
+
 test_that("a flammable pixel whose x gives p = 0 gets the year effect too", {
   t <- toyPowerLaw(x = c(-3, -2, 0.5, 1))                # the link clips x = -3 and -2 to p = 0
   expect_equal(as.vector(terra::values(t$sp))[1:2], c(0, 0))
