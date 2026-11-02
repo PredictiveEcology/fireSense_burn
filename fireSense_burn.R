@@ -18,7 +18,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_burn.Rmd"), ## same file
   reqdPkgs = list("data.table", "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
-                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9112)",
+                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9138)", # 9138: powerLawShape
                   "ggplot2", "ggspatial", "PredictiveEcology/reproducible@development",
                   "PredictiveEcology/SpaDES.tools@development (>= 2.1.3.9009)", "terra"),
   loadOrder = list(after = c("fireSense_ignitionPredict", "fireSense_spreadPredict")),
@@ -65,8 +65,8 @@ defineModule(sim, list(
                        "year's fires spread with plogis(qlogis(p) + z * sd). NULL or 0: no effect.")),
     expectsInput("fireSense_SpreadPowerLaw", "SpatRaster|numeric",
                  paste("From fireSense_spreadPredict, only for a fit made with `spreadLink = \"powerLaw\"`: `pc`, `gamma` and",
-                       "`floor` of `fireSenseUtils::powerLawLink()`, as a numeric vector with these names (one ELF) or a",
-                       "3-layer raster aligned with `fireSense_SpreadPredicted`. The year effect is then added to the linear",
+                       "`floor` (and `shape`, 1 if absent) of `fireSenseUtils::powerLawLink()`, as a numeric vector with these names (one ELF) or a",
+                       "raster aligned with `fireSense_SpreadPredicted`. The year effect is then added to the linear",
                        "predictor x, as in the fit: p = powerLawLink(x + z * sd), with x from `fireSense_SpreadLinear`.",
                        "NULL: the effect is added on the logit.")),
     expectsInput("fireSense_SpreadLinear", "SpatRaster",
@@ -471,14 +471,14 @@ yearSDLayer <- function(probRas, layer) {
 #' the ignitions' and escapes' z (`yearZ()`), and uses eps = z * sd. With a raster `sd` (several ELFs, each with
 #' its own fitted sd) the ELFs share the year's z, each scaled by its own sd. Without `powerLaw` eps is added on the
 #' logit: plogis(qlogis(p) + eps). With `powerLaw` (a fit with `spreadLink = "powerLaw"`) eps is added to the linear
-#' predictor x, as in the fit: p is `fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor)` for every pixel with an
+#' predictor x, as in the fit: p is `fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor, shape)` for every pixel with an
 #' x (`linear`). A flammable pixel with a low x has p of 0 in `spreadProbRas` (the link clips it), so x cannot be
 #' recovered from p, and `linear` is required. Pixels without an x (not flammable) keep their p.
 #'
 #' @param spreadProbRas `SpatRaster` of spread probability.
 #' @param sd `NULL`, one number, or a `SpatRaster` aligned with `spreadProbRas`.
-#' @param powerLaw `NULL` (logit), or `fireSense_SpreadPowerLaw`: a numeric vector or 3-layer `SpatRaster` with
-#'   `pc`, `gamma` and `floor`.
+#' @param powerLaw `NULL` (logit), or `fireSense_SpreadPowerLaw`: a numeric vector or `SpatRaster` with
+#'   `pc`, `gamma`, `floor` and `shape` (1 when absent).
 #' @param linear `fireSense_SpreadLinear`: the linear predictor x, a `SpatRaster` aligned with `spreadProbRas`; required
 #'   with `powerLaw` (and an `sd` above 0), else the function stops.
 #' @param z The year's z; `NULL` (what `burn` passes) draws one here.
@@ -503,8 +503,11 @@ yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL, linear 
   par1 <- function(nm) if (inherits(powerLaw, "SpatRaster")) terra::values(powerLaw[[nm]], mat = FALSE)
                        else rep_len(powerLaw[[nm]], length(p))
   pc <- par1("pc"); gamma <- par1("gamma"); flr <- par1("floor")
-  ok <- !is.na(x) & !is.na(pc) & !is.na(gamma) & !is.na(flr)
-  p[ok] <- fireSenseUtils::powerLawLink(x[ok] + z * s[ok], pc[ok], gamma[ok], flr[ok])
+  ## `shape` came with fireSenseUtils 0.2.3.9138; a fit's parameters without it are the original link
+  hasShape <- "shape" %in% names(powerLaw)
+  shape <- if (hasShape) par1("shape") else rep_len(fireSenseUtils::spreadPowerLawShape, length(p))
+  ok <- !is.na(x) & !is.na(pc) & !is.na(gamma) & !is.na(flr) & !is.na(shape)
+  p[ok] <- fireSenseUtils::powerLawLink(x[ok] + z * s[ok], pc[ok], gamma[ok], flr[ok], shape[ok])
   p
 }
 
