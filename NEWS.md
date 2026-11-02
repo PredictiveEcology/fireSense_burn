@@ -1,5 +1,7 @@
 # fireSense_burn (development version)
 
+* A run without `fireSense_dataPrepFit` (one that only predicts) gives the ignitions that do not escape their sizes: with a `studyArea`, `.inputObjects` makes `nonEscapedFireSizesHa` from the study area's NFDB fires (`fireSenseUtils::nfdbFirePointsOfCauses()`, `nonEscapedFireSizes()`), as `fireSense_dataPrepFit` does. Without them those ignitions burned nothing. New parameters `fireCauses` and `fireYears`, as in `fireSense_dataPrepFit`; new input `studyArea`.
+
 - The power-law year effect uses the link's `shape` too: `fireSense_SpreadPowerLaw` (from `fireSense_spreadPredict`) may carry `shape` (a vector element or a raster layer), and `yearSpreadProb()` maps `x + eps` with `fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor, shape)`. Without `shape` it is 1, the original link, so results are unchanged. Needs fireSenseUtils >= 0.2.3.9137.
 
 - Escapes are drawn binomially over a coarse pixel's ignitions (`drawEscapes()`), each ignition escaping with probability `escapeProb * (1 - exp(-igProb)) / igProb` (capped at 1), instead of `pmin(rpois(escapeProb), ignitions)`. The escape model is fitted on ignited pixel-years only, so `escapeProb` is already the mean escapes of an ignited pixel, and truncating a Poisson draw at the ignitions lowered it (about 21-25% too few escapes at ELF 11.3, where the ignition mean is low). Simulations and hindcasts now draw more escapes where the ignition mean is low, matching the escape fit.

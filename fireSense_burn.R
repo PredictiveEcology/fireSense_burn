@@ -37,6 +37,12 @@ defineModule(sim, list(
                     paste("Size (ha) a fire must reach to count as escaped, as in the spread fit: each escaped",
                           "fire burns this area first, whatever its spread probability, then spreads normally.",
                           "`NA` spreads escaped fires from their ignition pixel only.")),
+    defineParameter("fireCauses", "character", fireSenseUtils::fireSenseFireCauses, NA, NA,
+                    paste("As in `fireSense_dataPrepFit`: the fire causes whose observed sizes the ignitions that",
+                          "do not escape draw from, when `.inputObjects` makes `nonEscapedFireSizesHa`.")),
+    defineParameter("fireYears", "integer", fireSenseUtils::defaultFireYears(), NA, NA,
+                    paste("As in `fireSense_dataPrepFit`: the years of those observed fires, when `.inputObjects`",
+                          "makes `nonEscapedFireSizesHa`.")),
     defineParameter("ignitionSource", "character", "predicted", NA, NA,
                     paste("Where each year's fires start. `\"predicted\"`: ignitions and escapes are drawn from",
                           "`fireSense_IgAndEscapeProbRas`. `\"observedEscapes\"` (for hindcasts that test spread alone):",
@@ -95,7 +101,11 @@ defineModule(sim, list(
     expectsInput("nonEscapedFireSizesHa", "numeric",
                  paste("Sizes (ha) of the study area's observed fires below `escapeSizeHa`, from",
                        "fireSense_dataPrepFit. Each ignition that did not escape burns a patch of a size drawn",
-                       "from these. `NULL`: ignitions that did not escape burn nothing.")),
+                       "from these. Unsupplied, with a `studyArea` (a run without fireSense_dataPrepFit), `.inputObjects`",
+                       "makes them the same way, from the NFDB fires of `fireCauses` in `fireYears`. `NULL`: ignitions",
+                       "that did not escape burn nothing.")),
+    expectsInput("studyArea", "SpatVector",
+                 "Only for making `nonEscapedFireSizesHa`: the study area whose NFDB fires give the sizes."),
     expectsInput("rasterToMatch", "SpatRaster", sourceURL = NA,
                  "Template raster for the study area, ideally buffered to limit fire edge effects.")
   ),
@@ -579,4 +589,23 @@ placeIgnitions <- function(igs, drawTable) {
   ## no ignited coarse pixel: rbindlist(list()) has no columns, so keep the schema of a normal year
   if (!length(out)) return(igs[integer(0), ..cols])
   rbindlist(out)
+}
+
+#' Supply default inputs
+#'
+#' `nonEscapedFireSizesHa`, in a run without `fireSense_dataPrepFit` (which makes it): the sizes of the
+#' study area's NFDB fires (of `fireCauses`, in `fireYears`) below `escapeSizeHa`. Without them every
+#' ignition that did not escape burned nothing in a run that only predicts. Not without a `studyArea`.
+#'
+#' @param sim A `simList`.
+#'
+#' @return The `simList`, invisibly.
+.inputObjects <- function(sim) {
+  if (!suppliedElsewhere("nonEscapedFireSizesHa", sim) && !is.null(sim$studyArea)) {
+    shp <- fireSenseUtils::fireRecordShapefile(fireSenseUtils::nfdbPointUrl(), destinationPath = inputPath(sim))
+    pts <- fireSenseUtils::nfdbFirePointsOfCauses(shp, studyArea = sim$studyArea, years = P(sim)$fireYears,
+                                                  causes = P(sim)$fireCauses)
+    sim$nonEscapedFireSizesHa <- fireSenseUtils::nonEscapedFireSizes(pts, P(sim)$escapeSizeHa)
+  }
+  invisible(sim)
 }

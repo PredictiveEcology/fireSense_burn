@@ -26,7 +26,8 @@ test_that("inputs are the expected names and classes", {
       ignitionFirePoints                = "SpatVector",
       ignitionFitRTM                    = "SpatRaster",
       nonEscapedFireSizesHa             = "numeric",
-      rasterToMatch                     = "SpatRaster")
+      rasterToMatch                     = "SpatRaster",
+      studyArea                         = "SpatVector")
   )
 })
 
@@ -51,6 +52,8 @@ test_that("parameters are the expected names and classes", {
                 .runInterval          = "numeric",
                 .studyAreaName        = "character",
                 escapeSizeHa          = "numeric",
+                fireCauses            = "character",
+                fireYears             = "integer",
                 ignitionSource        = "character",
                 jumpMeanDist          = "numeric",
                 jumpTries             = "integer",
