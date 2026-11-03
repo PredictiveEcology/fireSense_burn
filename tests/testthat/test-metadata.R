@@ -26,7 +26,8 @@ test_that("inputs are the expected names and classes", {
       ignitionFirePoints                = "SpatVector",
       ignitionFitRTM                    = "SpatRaster",
       nonEscapedFireSizesHa             = "numeric",
-      rasterToMatch                     = "SpatRaster")
+      rasterToMatch                     = "SpatRaster",
+      studyArea                         = "SpatVector")
   )
 })
 
@@ -51,6 +52,8 @@ test_that("parameters are the expected names and classes", {
                 .runInterval          = "numeric",
                 .studyAreaName        = "character",
                 escapeSizeHa          = "numeric",
+                fireCauses            = "character",
+                fireYears             = "integer",
                 ignitionSource        = "character",
                 jumpMeanDist          = "numeric",
                 jumpTries             = "integer",
@@ -83,7 +86,7 @@ test_that("every parameter, input and output has a description", {
 })
 
 test_that("required packages are unchanged", {
-  expect_setequal(unlist(md$reqdPkgs), c("data.table", "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9138)",
+  expect_setequal(unlist(md$reqdPkgs), c("data.table", "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9142)",
                                          "ggplot2", "ggspatial", "PredictiveEcology/reproducible@development",
                                          "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
                                          "PredictiveEcology/SpaDES.tools@development (>= 2.1.3.9009)", "terra"))

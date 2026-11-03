@@ -94,3 +94,25 @@ test_that("small fires keep the expected area and never burn pixels already burn
 test_that("a clear error when ignitionsAndEscapes has no `escaped`", {
   expect_error(runFireSense(data.table::data.table(pixelID = 1L, escapes = 1L)), "escaped")
 })
+
+## A run without fireSense_dataPrepFit (only predicting) had no nonEscapedFireSizesHa, so every ignition that did
+## not escape burned nothing (2026-11-02, ELFs 6.6.1 and 6.6.2). With a study area, .inputObjects makes them as
+## fireSense_dataPrepFit does: the NFDB fires of fireCauses in fireYears, below escapeSizeHa.
+test_that("without fireSense_dataPrepFit, .inputObjects takes the non-escaped sizes from the study area's NFDB fires", {
+  asked <- new.env()
+  local_mocked_bindings(
+    fireRecordShapefile = function(url, destinationPath, ...) "NFDB_point_20260811.shp",
+    nfdbFirePointsOfCauses = function(shp, studyArea, years, causes) {
+      asked$years <- years; asked$causes <- causes
+      data.frame(SIZE_HA = c(1, 30, 80, 0))
+    }, .package = "fireSenseUtils")
+  sa <- terra::as.polygons(terra::ext(toyRTM()), crs = terra::crs(toyRTM()))
+  sim <- runFireSense(igRows(10L, FALSE), objects = list(studyArea = sa), doSpades = FALSE,
+                      params = list(fireYears = 2001:2010, fireCauses = "natural"))
+  expect_equal(sim$nonEscapedFireSizesHa, c(1, 30))          # below escapeSizeHa (50), and positive
+  expect_identical(asked$years, 2001:2010)
+  expect_identical(asked$causes, "natural")
+  ## supplied sizes are kept
+  sim <- runFireSense(igRows(10L, FALSE), objects = list(studyArea = sa, nonEscapedFireSizesHa = 25), doSpades = FALSE)
+  expect_identical(sim$nonEscapedFireSizesHa, 25)
+})
