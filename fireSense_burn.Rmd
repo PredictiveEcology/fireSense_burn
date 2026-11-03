@@ -99,7 +99,7 @@ knitr::kable(df_outputs, caption = "List of (ref:fireSense_burn) outputs and the
 
 `fireSense_burn` needs the objects made by the predict modules, so run it with them:
 
-```{r module usage example, eval = FALSE}
+```{r usage-fireSense-burn, eval = FALSE}
 library(SpaDES.core)
 
 modules <- list("fireSense_dataPrepPredict", "fireSense_ignitionPredict",
