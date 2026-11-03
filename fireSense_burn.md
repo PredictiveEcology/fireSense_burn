@@ -1,7 +1,7 @@
 ---
 title: "fireSense_burn Manual"
 subtitle: "v.0.0.0.9000"
-date: "Last updated: 2026-11-02"
+date: "Last updated: 2026-11-03"
 output:
   bookdown::html_document2:
     toc: true
@@ -115,7 +115,13 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
   <tr>
    <td style="text-align:left;"> nonEscapedFireSizesHa </td>
    <td style="text-align:left;"> numeric </td>
-   <td style="text-align:left;"> Sizes (ha) of the study area's observed fires below `escapeSizeHa`, from fireSense_dataPrepFit. Each ignition that did not escape burns a patch of a size drawn from these. `NULL`: ignitions that did not escape burn nothing. </td>
+   <td style="text-align:left;"> Sizes (ha) of the study area's observed fires below `escapeSizeHa`, from fireSense_dataPrepFit. Each ignition that did not escape burns a patch of a size drawn from these. Unsupplied, with a `studyArea` (a run without fireSense_dataPrepFit), `.inputObjects` makes them the same way, from the NFDB fires of `fireCauses` in `fireYears`. `NULL`: ignitions that did not escape burn nothing. </td>
+   <td style="text-align:left;"> NA </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> studyArea </td>
+   <td style="text-align:left;"> SpatVector </td>
+   <td style="text-align:left;"> Only for making `nonEscapedFireSizesHa`: the study area whose NFDB fires give the sizes. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
@@ -196,6 +202,24 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn)
    <td style="text-align:left;"> 0 </td>
    <td style="text-align:left;"> NA </td>
    <td style="text-align:left;"> Size (ha) a fire must reach to count as escaped, as in the spread fit: each escaped fire burns this area first, whatever its spread probability, then spreads normally. `NA` spreads escaped fires from their ignition pixel only. </td>
+   <td style="text-align:left;"> TRUE </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> fireCauses </td>
+   <td style="text-align:left;"> character </td>
+   <td style="text-align:left;"> natural,.... </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> As in `fireSense_dataPrepFit`: the fire causes whose observed sizes the ignitions that do not escape draw from, when `.inputObjects` makes `nonEscapedFireSizesHa`. </td>
+   <td style="text-align:left;"> TRUE </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> fireYears </td>
+   <td style="text-align:left;"> integer </td>
+   <td style="text-align:left;"> 1986, 19.... </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> As in `fireSense_dataPrepFit`: the years of those observed fires, when `.inputObjects` makes `nonEscapedFireSizesHa`. </td>
    <td style="text-align:left;"> TRUE </td>
   </tr>
   <tr>

@@ -2973,7 +2973,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">fireSense_burn Manual</h1>
 <h3 class="subtitle">v.0.0.0.9000</h3>
-<h4 class="date">Last updated: 2026-11-02</h4>
+<h4 class="date">Last updated: 2026-11-03</h4>
 
 </div>
 
@@ -3156,7 +3156,21 @@ nonEscapedFireSizesHa
 numeric
 </td>
 <td style="text-align:left;">
-Sizes (ha) of the study area’s observed fires below <code>escapeSizeHa</code>, from fireSense_dataPrepFit. Each ignition that did not escape burns a patch of a size drawn from these. <code>NULL</code>: ignitions that did not escape burn nothing.
+Sizes (ha) of the study area’s observed fires below <code>escapeSizeHa</code>, from fireSense_dataPrepFit. Each ignition that did not escape burns a patch of a size drawn from these. Unsupplied, with a <code>studyArea</code> (a run without fireSense_dataPrepFit), <code>.inputObjects</code> makes them the same way, from the NFDB fires of <code>fireCauses</code> in <code>fireYears</code>. <code>NULL</code>: ignitions that did not escape burn nothing.
+</td>
+<td style="text-align:left;">
+NA
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+studyArea
+</td>
+<td style="text-align:left;">
+SpatVector
+</td>
+<td style="text-align:left;">
+Only for making <code>nonEscapedFireSizesHa</code>: the study area whose NFDB fires give the sizes.
 </td>
 <td style="text-align:left;">
 NA
@@ -3341,6 +3355,52 @@ NA
 </td>
 <td style="text-align:left;">
 Size (ha) a fire must reach to count as escaped, as in the spread fit: each escaped fire burns this area first, whatever its spread probability, then spreads normally. <code>NA</code> spreads escaped fires from their ignition pixel only.
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+fireCauses
+</td>
+<td style="text-align:left;">
+character
+</td>
+<td style="text-align:left;">
+natural,….
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+As in <code>fireSense_dataPrepFit</code>: the fire causes whose observed sizes the ignitions that do not escape draw from, when <code>.inputObjects</code> makes <code>nonEscapedFireSizesHa</code>.
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+fireYears
+</td>
+<td style="text-align:left;">
+integer
+</td>
+<td style="text-align:left;">
+1986, 19….
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+As in <code>fireSense_dataPrepFit</code>: the years of those observed fires, when <code>.inputObjects</code> makes <code>nonEscapedFireSizesHa</code>.
 </td>
 <td style="text-align:left;">
 TRUE
