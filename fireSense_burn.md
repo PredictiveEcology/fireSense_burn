@@ -1,7 +1,7 @@
 ---
 title: "fireSense_burn Manual"
 subtitle: "v.0.0.0.9000"
-date: "Last updated: 2026-11-03"
+date: "Last updated: 2026-11-05"
 output:
   bookdown::html_document2:
     toc: true
