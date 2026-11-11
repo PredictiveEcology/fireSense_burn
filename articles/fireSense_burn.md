@@ -1,7 +1,7 @@
 ---
 title: "fireSense_burn Manual"
 subtitle: "v.0.0.0.9000"
-date: "Last updated: 2026-11-05"
+date: "Last updated: 2026-11-11"
 output:
   bookdown::html_document2:
     toc: true
@@ -103,9 +103,27 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
-   <td style="text-align:left;"> ignitionFirePoints </td>
-   <td style="text-align:left;"> SpatVector </td>
-   <td style="text-align:left;"> Only with `ignitionSource = "observedEscapes"`: observed fire points with columns `YEAR` and `SIZE_HA`, in the CRS of `rasterToMatch` (from fireSense_dataPrepFit: the NFDB natural-cause points). </td>
+   <td style="text-align:left;"> firePolys </td>
+   <td style="text-align:left;"> list </td>
+   <td style="text-align:left;"> Only with `ignitionSource = "observedEscapes"`: the annual fire polygons (`YEAR`, `POLY_HA`, `FIRECAUS`), as in fireSense_dataPrepFit. </td>
+   <td style="text-align:left;"> NA </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> fireSense_SpreadFireSD </td>
+   <td style="text-align:left;"> SpatRaster&amp;#124;numeric </td>
+   <td style="text-align:left;"> From fireSense_spreadPredict: the sd of the per-fire random effect on the linear predictor x of a spread fit made with `spreadLink = "powerLaw"` (`fireSpreadSD`), a raster aligned with `fireSense_SpreadPredicted` (per ELF) or one number. Above 0, each fire spreads with its own offset ~ N(0, sd) on x, with the link parameters of its pixel (`SpaDES.tools::spreadCpp(link =)`), which needs `fireSense_SpreadPowerLaw` and `fireSense_SpreadLinear`. NULL or 0: no effect, and the spread is that of earlier versions. </td>
+   <td style="text-align:left;"> NA </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> fireSense_EscapeDefinition </td>
+   <td style="text-align:left;"> data.frame </td>
+   <td style="text-align:left;"> From fireSense_spreadPredict: the escape definition (`escapeSizeHa`, `fireCauses`) of each fitted ELF (one row each, with `polygonID`). Every row that is not `NA` must equal this module's `escapeSizeHa` and `fireCauses` (an error otherwise). `NA` rows (fits made before the definition was recorded) and NULL are not checked. </td>
+   <td style="text-align:left;"> NA </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> rasterToMatchLargeELF </td>
+   <td style="text-align:left;"> SpatRaster </td>
+   <td style="text-align:left;"> From fireSense_ELFs. Fires start only in its core: the cells with `fireSenseUtils::fireSenseELFCoreValue` (2; the buffer is 1) of a one-ELF raster, every labelled cell of a multi-ELF (categorical) raster, which has no buffer. The fires spread into the buffer. NULL: a fire may start anywhere. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
@@ -203,7 +221,7 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn)
    <td style="text-align:left;"> 50 </td>
    <td style="text-align:left;"> 0 </td>
    <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> Size (ha) a fire must reach to count as escaped, as in the spread fit: each escaped fire burns this area first, whatever its spread probability, then spreads normally. `NA` spreads escaped fires from their ignition pixel only. </td>
+   <td style="text-align:left;"> Size (ha) of the whole fire polygon at and above which a fire escaped: the definition of the fit (`fireSenseUtils::escapeDefinition()`). Each escaped fire burns this area first, whatever its spread probability, then spreads normally. Must equal the `escapeSizeHa` of every other module in the simList (an error otherwise) and of the fit (`fireSense_EscapeDefinition`, an error otherwise). `NA` spreads escaped fires from their ignition pixel only, with no escape definition. </td>
    <td style="text-align:left;"> TRUE </td>
   </tr>
   <tr>
@@ -212,7 +230,7 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn)
    <td style="text-align:left;"> natural,.... </td>
    <td style="text-align:left;"> NA </td>
    <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> As in `fireSense_dataPrepFit`: the fire causes whose observed sizes the ignitions that do not escape draw from, when `.inputObjects` makes `nonEscapedFireSizesHa`. </td>
+   <td style="text-align:left;"> The fire cause groups of the escape definition, as in `fireSense_dataPrepFit` (which must agree: an error otherwise; so must the fit, `fireSense_EscapeDefinition`). Also the causes whose observed sizes the ignitions that do not escape draw from, when `.inputObjects` makes `nonEscapedFireSizesHa`. </td>
    <td style="text-align:left;"> TRUE </td>
   </tr>
   <tr>
@@ -230,7 +248,7 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn)
    <td style="text-align:left;"> predicted </td>
    <td style="text-align:left;"> NA </td>
    <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> Where each year's fires start. `"predicted"`: ignitions and escapes are drawn from `fireSense_IgAndEscapeProbRas`. `"observedEscapes"` (for hindcasts that test spread alone): the year's observed escapes in `ignitionFirePoints` (fires of at least `escapeSizeHa` and larger than a pixel, of year `floor(time(sim))`) are spread from the pixels of their points, and nothing is drawn from the predicted surfaces. Observed fires that did not escape are left out. </td>
+   <td style="text-align:left;"> Where each year's fires start. `"predicted"`: ignitions and escapes are drawn from `fireSense_IgAndEscapeProbRas`. `"observedEscapes"` (for hindcasts that test spread alone): the year's observed escapes in `firePolys` (the escape definition, year `floor(time(sim))`) are spread from the snapped centroids of their polygons, the starts of the spread fit (`fireSenseUtils::escapeFireSet()`), and nothing is drawn from the predicted surfaces. Either way a fire starts only in the core of `rasterToMatchLargeELF`; it still spreads into the buffer. </td>
    <td style="text-align:left;"> TRUE </td>
   </tr>
   <tr>

@@ -9,6 +9,7 @@
 <url><loc>/index.html</loc></url>
 <url><loc>/news/index.html</loc></url>
 <url><loc>/reference/burn.html</loc></url>
+<url><loc>/reference/cellValues.html</loc></url>
 <url><loc>/reference/coarseToFineMap.html</loc></url>
 <url><loc>/reference/doEvent.fireSense_burn.html</loc></url>
 <url><loc>/reference/dot-inputObjects.html</loc></url>
@@ -18,10 +19,14 @@
 <url><loc>/reference/emptyBurnRaster.html</loc></url>
 <url><loc>/reference/fineCoarseTable.html</loc></url>
 <url><loc>/reference/index.html</loc></url>
+<url><loc>/reference/linkedSpread.html</loc></url>
+<url><loc>/reference/observedEscapeStarts.html</loc></url>
 <url><loc>/reference/observedEscapes.html</loc></url>
 <url><loc>/reference/placeIgnitions.html</loc></url>
+<url><loc>/reference/powerLawPars.html</loc></url>
 <url><loc>/reference/smallFires.html</loc></url>
 <url><loc>/reference/yearSDLayer.html</loc></url>
+<url><loc>/reference/yearSpreadEps.html</loc></url>
 <url><loc>/reference/yearSpreadProb.html</loc></url>
 <url><loc>/reference/yearZ.html</loc></url>
 </urlset>
