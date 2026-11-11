@@ -106,10 +106,11 @@ defineModule(sim, list(
                        "offset ~ N(0, sd) on x, with the link parameters of its pixel (`SpaDES.tools::spreadCpp(link =)`),",
                        "which needs `fireSense_SpreadPowerLaw` and `fireSense_SpreadLinear`. NULL or 0: no effect, and the",
                        "spread is that of earlier versions.")),
-    expectsInput("fireSense_EscapeDefinition", "data.table",
-                 paste("From fireSense_spreadPredict: the escape definition (`escapeSizeHa`, `fireCauses`) the spread was",
-                       "fitted with. It must equal this module's `escapeSizeHa` and `fireCauses` (an error otherwise).",
-                       "NULL, or a fit without it: not checked.")),
+    expectsInput("fireSense_EscapeDefinition", "data.frame",
+                 paste("From fireSense_spreadPredict: the escape definition (`escapeSizeHa`, `fireCauses`) of each fitted",
+                       "ELF (one row each, with `polygonID`). Every row that is not `NA` must equal this module's",
+                       "`escapeSizeHa` and `fireCauses` (an error otherwise). `NA` rows (fits made before the definition was",
+                       "recorded) and NULL are not checked.")),
     expectsInput("rasterToMatchLargeELF", "SpatRaster",
                  paste("From fireSense_ELFs. Fires start only in its core: the cells with `fireSenseUtils::fireSenseELFCoreValue`",
                        "(2; the buffer is 1) of a one-ELF raster, every labelled cell of a multi-ELF (categorical) raster, which",
@@ -247,9 +248,7 @@ burn <- function(sim) {
   ## and sharing spread's z burned about twice the area.
   ## With ignitionSource = "observedEscapes" the year's observed escapes are spread instead and nothing is drawn,
   ## so a hindcast tests spread alone.
-  if (!is.null(sim$fireSense_EscapeDefinition))
-    fireSenseUtils::checkEscapeDefinition(sim$fireSense_EscapeDefinition, fireSenseUtils::escapeDefinition(
-      Par$escapeSizeHa, Par$fireCauses), what = "fireSense_spreadPredict's fit")
+  checkFitEscapeDefinition(sim$fireSense_EscapeDefinition, Par$escapeSizeHa, Par$fireCauses)
   if (identical(Par$ignitionSource, "observedEscapes")) {
     ## the starts of the year's observed escapes: the spread fit's, found once (all years) and kept in `mod`
     if (is.null(mod$observedStarts))
@@ -469,6 +468,20 @@ observedEscapeStarts <- function(firePolys, flammableRTM, escapeSizeHa, fireCaus
 observedEscapes <- function(starts, year) {
   cells <- starts$pixelID[starts$YEAR == year & !is.na(starts$pixelID)]
   data.table(pixelID = cells, escaped = rep(TRUE, length(cells)))
+}
+
+#' Stop if a fit's escape definition differs from this run's
+#'
+#' @param def `fireSense_EscapeDefinition`: a `data.frame`, one row per ELF, or `NULL`.
+#' @param escapeSizeHa,fireCauses This run's escape definition.
+#' @return `NULL`, invisibly; an error naming the ELF if a row that is not `NA` differs.
+checkFitEscapeDefinition <- function(def, escapeSizeHa, fireCauses) {
+  if (is.null(def) || is.na(escapeSizeHa)) return(invisible())
+  current <- fireSenseUtils::escapeDefinition(escapeSizeHa, fireCauses)
+  for (i in which(!is.na(def$escapeSizeHa)))
+    fireSenseUtils::checkEscapeDefinition(def[i, , drop = FALSE], current, what = paste0(
+      "fireSense_spreadPredict's fit", if ("polygonID" %in% names(def)) paste0(" of ELF ", def$polygonID[i])))
+  invisible()
 }
 
 #' The cells a fire may start in

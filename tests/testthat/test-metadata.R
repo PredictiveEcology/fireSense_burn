@@ -17,7 +17,7 @@ test_that("inputs are the expected names and classes", {
   expect_identical(
     inputs[order(names(inputs))],
     c(firePolys                         = "list",
-      fireSense_EscapeDefinition        = "data.table",
+      fireSense_EscapeDefinition        = "data.frame",
       fireSense_IgAndEscapeDistribution = "list",
       fireSense_IgAndEscapeProbRas      = "SpatRaster",
       fireSense_SpreadFireSD            = "SpatRaster|numeric",
