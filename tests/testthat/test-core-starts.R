@@ -37,28 +37,18 @@ test_that("a multi-ELF (categorical) raster has no buffer: every labelled cell i
   r <- toyRTM()
   terra::values(r) <- ifelse(toyCol(r) <= 5, 1L, 2L)           # ELFs 1 and 2: 2 must not be read as 'core'
   levels(r) <- data.frame(value = 1:2, ELFind = c("a", "b"))
-  expect_true(all(coreCells(r)))
   r[1] <- NA
-  expect_identical(which(!coreCells(r)), 1L)
   sim <- runFireSense(igRowsEsc(c(2L, 10L)), objects = list(rasterToMatchLargeELF = r))
   expect_identical(sort(unique(sim$burnDT$initialPixels)), c(2L, 10L))
-})
-
-test_that("a one-ELF raster's core is its value 2, from fireSenseUtils", {
-  expect_identical(which(coreCells(toyLargeELF())), which(toyCol(toyRTM()) %in% 6:8))
 })
 
 ## fireSense_EscapeDefinition from fireSense_spreadPredict: one row per ELF, NA for a fit without a recorded definition
 test_that("every non-NA row of the fit's escape definition must equal this run's", {
   def <- function(size) data.frame(escapeSizeHa = c(50, size), fireCauses = c("natural,unknown", if (is.na(size)) NA else "natural,unknown"),
                                    polygonID = c("1.1", "1.2"))
-  cs <- c("natural", "unknown")
-  expect_silent(checkFitEscapeDefinition(def(NA_real_), 50, cs))      # one matching, one NA
-  expect_silent(checkFitEscapeDefinition(NULL, 50, cs))
-  expect_error(checkFitEscapeDefinition(def(100), 50, cs), "ELF 1.2")  # the second row (100 ha) differs
   d <- def(NA_real_); d$escapeSizeHa[1] <- 25
-  expect_error(checkFitEscapeDefinition(d, 50, cs), "differs")
-  ## and burn() stops on it
   expect_error(runFireSense(igRowsEsc(6L), objects = list(fireSense_EscapeDefinition = d)), "differs")
+  d <- def(100)                                                        # the second row (100 ha) differs
+  expect_error(runFireSense(igRowsEsc(6L), objects = list(fireSense_EscapeDefinition = d)), "ELF 1.2")
   expect_no_error(runFireSense(igRowsEsc(6L), objects = list(fireSense_EscapeDefinition = def(NA_real_))))
 })

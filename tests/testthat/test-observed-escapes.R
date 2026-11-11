@@ -94,12 +94,12 @@ test_that("observedEscapes needs firePolys", {
 test_that("observedEscapeStarts() are fireSenseUtils::escapeFireSet()'s starts, one per escape polygon", {
   polys <- obsPolys()
   st <- fireSenseUtils::escapeFireSet(polys, toyFlammable())
-  got <- observedEscapeStarts(polys, toyFlammable(), 50, c("natural", "unknown"))
+  got <- observedEscapeStarts(polys, toyFlammable(), fireSenseUtils::escapeDefinition(50, c("natural", "unknown")))
   expect_identical(got$pixelID, as.integer(st$pixelID))
   expect_identical(got$YEAR, as.integer(st$YEAR))
   expect_identical(nrow(got), 2L)                    # the 10 ha fire is not an escape
   ## a smaller escape size takes it in
-  expect_identical(nrow(observedEscapeStarts(polys, toyFlammable(), 5, c("natural", "unknown"))), 3L)
+  expect_identical(nrow(observedEscapeStarts(polys, toyFlammable(), fireSenseUtils::escapeDefinition(5, c("natural", "unknown")))), 3L)
   expect_identical(observedEscapes(got, 2), data.table::data.table(pixelID = got$pixelID[got$YEAR == 2L], escaped = TRUE))
   expect_identical(nrow(observedEscapes(got, 3)), 0L)
 })
