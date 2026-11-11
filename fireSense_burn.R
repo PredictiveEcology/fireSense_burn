@@ -33,22 +33,26 @@ defineModule(sim, list(
                     "Years between `burn` events. `NA` burns once only."),
     defineParameter(".studyAreaName", "character", NA, NA, NA,
                     "Human-readable name for the study area used."),
-    defineParameter("escapeSizeHa", "numeric", 50, 0, NA,
-                    paste("Size (ha) a fire must reach to count as escaped, as in the spread fit: each escaped",
-                          "fire burns this area first, whatever its spread probability, then spreads normally.",
-                          "`NA` spreads escaped fires from their ignition pixel only.")),
+    defineParameter("escapeSizeHa", "numeric", fireSenseUtils::fireSenseEscapeSizeHa, 0, NA,
+                    paste("Size (ha) of the whole fire polygon at and above which a fire escaped: the definition of the fit",
+                          "(`fireSenseUtils::escapeDefinition()`). Each escaped fire burns this area first, whatever its",
+                          "spread probability, then spreads normally. Must equal the `escapeSizeHa` of every other module in",
+                          "the simList (an error otherwise) and of the fit (`fireSense_EscapeDefinition`, an error otherwise).",
+                          "`NA` spreads escaped fires from their ignition pixel only, with no escape definition.")),
     defineParameter("fireCauses", "character", fireSenseUtils::fireSenseFireCauses, NA, NA,
-                    paste("As in `fireSense_dataPrepFit`: the fire causes whose observed sizes the ignitions that",
-                          "do not escape draw from, when `.inputObjects` makes `nonEscapedFireSizesHa`.")),
+                    paste("The fire cause groups of the escape definition, as in `fireSense_dataPrepFit` (which must agree:",
+                          "an error otherwise; so must the fit, `fireSense_EscapeDefinition`). Also the causes whose observed",
+                          "sizes the ignitions that do not escape draw from, when `.inputObjects` makes `nonEscapedFireSizesHa`.")),
     defineParameter("fireYears", "integer", fireSenseUtils::defaultFireYears(), NA, NA,
                     paste("As in `fireSense_dataPrepFit`: the years of those observed fires, when `.inputObjects`",
                           "makes `nonEscapedFireSizesHa`.")),
     defineParameter("ignitionSource", "character", "predicted", NA, NA,
                     paste("Where each year's fires start. `\"predicted\"`: ignitions and escapes are drawn from",
                           "`fireSense_IgAndEscapeProbRas`. `\"observedEscapes\"` (for hindcasts that test spread alone):",
-                          "the year's observed escapes in `ignitionFirePoints` (fires of at least `escapeSizeHa` and larger",
-                          "than a pixel, of year `floor(time(sim))`) are spread from the pixels of their points, and nothing",
-                          "is drawn from the predicted surfaces. Observed fires that did not escape are left out.")),
+                          "the year's observed escapes in `firePolys` (the escape definition, year `floor(time(sim))`) are spread",
+                          "from the snapped centroids of their polygons, the starts of the spread fit",
+                          "(`fireSenseUtils::escapeFireSet()`), and nothing is drawn from the predicted surfaces.",
+                          "Either way a fire starts only in the core of `rasterToMatchLargeELF`; it still spreads into the buffer.")),
     defineParameter("jumpTries", "integer", 20L, 0L, NA,
                     paste("Passed to `SpaDES.tools::spreadCpp()` for escaped fires: attempts to jump for a fire",
                           "still under `escapeSizeHa` that has nowhere left to spread. Default 20, as fireSense_spreadFit fits",
@@ -92,10 +96,25 @@ defineModule(sim, list(
     expectsInput("fireSense_IgAndEscapeDistribution", "list",
                  paste("`list(ignition = , escape = )`, from fireSense_ignitionPredict: the objective the ignition and",
                        "escape models were fitted with. Only `\"count:poisson\"` can be drawn from.")),
-    expectsInput("ignitionFirePoints", "SpatVector",
-                 paste("Only with `ignitionSource = \"observedEscapes\"`: observed fire points with columns `YEAR`",
-                       "and `SIZE_HA`, in the CRS of `rasterToMatch` (from fireSense_dataPrepFit: the NFDB",
-                       "natural-cause points).")),
+    expectsInput("firePolys", "list",
+                 paste("Only with `ignitionSource = \"observedEscapes\"`: the annual fire polygons (`YEAR`, `POLY_HA`,",
+                       "`FIRECAUS`), as in fireSense_dataPrepFit.")),
+    expectsInput("fireSense_SpreadFireSD", "SpatRaster|numeric",
+                 paste("From fireSense_spreadPredict: the sd of the per-fire random effect on the linear predictor x of a",
+                       "spread fit made with `spreadLink = \"powerLaw\"` (`fireSpreadSD`), a raster aligned with",
+                       "`fireSense_SpreadPredicted` (per ELF) or one number. Above 0, each fire spreads with its own",
+                       "offset ~ N(0, sd) on x, with the link parameters of its pixel (`SpaDES.tools::spreadCpp(link =)`),",
+                       "which needs `fireSense_SpreadPowerLaw` and `fireSense_SpreadLinear`. NULL or 0: no effect, and the",
+                       "spread is that of earlier versions.")),
+    expectsInput("fireSense_EscapeDefinition", "data.frame",
+                 paste("From fireSense_spreadPredict: the escape definition (`escapeSizeHa`, `fireCauses`) of each fitted",
+                       "ELF (one row each, with `polygonID`). Every row that is not `NA` must equal this module's",
+                       "`escapeSizeHa` and `fireCauses` (an error otherwise). `NA` rows (fits made before the definition was",
+                       "recorded) and NULL are not checked.")),
+    expectsInput("rasterToMatchLargeELF", "SpatRaster",
+                 paste("From fireSense_ELFs. Fires start only in its core: the cells with `fireSenseUtils::fireSenseELFCoreValue`",
+                       "(2; the buffer is 1) of a one-ELF raster, every labelled cell of a multi-ELF (categorical) raster, which",
+                       "has no buffer. The fires spread into the buffer. NULL: a fire may start anywhere.")),
     expectsInput("ignitionFitRTM", "SpatRaster",
                  "The coarse raster the ignition and escape models were fitted on (from fireSense_dataPrepFit)."),
     expectsInput("nonEscapedFireSizesHa", "numeric",
@@ -155,8 +174,9 @@ doEvent.fireSense_burn = function(sim, eventTime, eventType, debug = FALSE) {
       if (!P(sim)$ignitionSource %in% c("predicted", "observedEscapes"))
         stop("fireSense_burn: ignitionSource must be \"predicted\" or \"observedEscapes\"")
       if (identical(P(sim)$ignitionSource, "observedEscapes") &&
-          (is.null(sim$ignitionFirePoints) || is.na(P(sim)$escapeSizeHa)))
-        stop("fireSense_burn: ignitionSource = \"observedEscapes\" needs `ignitionFirePoints` and an `escapeSizeHa`")
+          is.null(sim$firePolys))
+        stop("fireSense_burn: ignitionSource = \"observedEscapes\" needs `firePolys`")
+      fireSenseUtils::escapeDefinitionOf(sim)
 
       ## trying to avoid the raster warning no non-missing arguments to max
       sim$burnMap <- rast(sim$rasterToMatch)
@@ -225,16 +245,24 @@ burn <- function(sim) {
   ## and sharing spread's z burned about twice the area.
   ## With ignitionSource = "observedEscapes" the year's observed escapes are spread instead and nothing is drawn,
   ## so a hindcast tests spread alone.
+  definition <- fireSenseUtils::escapeDefinitionOf(sim)
+  fireSenseUtils::checkEscapeDefinition(sim$fireSense_EscapeDefinition, definition, "fireSense_spreadPredict's fit")
   if (identical(Par$ignitionSource, "observedEscapes")) {
-    sim$ignitionsAndEscapes <- observedEscapes(sim$ignitionFirePoints, floor(time(sim) + 1e-9), tmpl,
-                                               Par$escapeSizeHa)
+    ## the starts of the year's observed escapes: the spread fit's, found once (all years) and kept in `mod`
+    if (is.null(mod$observedStarts))
+      mod$observedStarts <- observedEscapeStarts(sim$firePolys, sim$flammableRTM, definition)
+    sim$ignitionsAndEscapes <- observedEscapes(mod$observedStarts, floor(time(sim) + 1e-9))
   } else {
     z <- yearZ(sim$fireSense_IgAndEscapeProbRas)
     if (!is.null(sim$fireSense_IgAndEscapeProbRas))
       sim$ignitionsAndEscapes <- drawIgnitionsAndEscapes(sim, store = mod, z = z)
   }
 
+  ## A fire starts only in the core (the buffer removes edge effects, it has no fires of its own): the ignition
+  ## surfaces stay complete, only the starts are dropped. The fire spreads into the buffer from a core start.
   ig <- sim$ignitionsAndEscapes
+  if (!is.null(sim$rasterToMatchLargeELF) && NROW(ig))
+    ig <- ig[fireSenseUtils::inELFCore(ig$pixelID, sim$rasterToMatchLargeELF), ]
   if (NROW(ig) == 0L || !"fireSense_spreadPredict" %in% P(sim)$whichModulesToPrepare)
     return(invisible(sim))
   if (!"escaped" %in% names(ig))
@@ -242,9 +270,15 @@ burn <- function(sim) {
          "(fireSense_ignitionPredict >= 1.0.0.9003). Its `escapes` is a coarse pixel's count, repeated ",
          "on each of that pixel's ignitions, so it cannot say which fires to spread.")
 
-  ## this year's spread probability, with the year's random effect if the fit has one
-  spreadProbYear <- yearSpreadProb(sim$fireSense_SpreadPredicted, sim$fireSense_SpreadSD, sim$fireSense_SpreadPowerLaw,
-                                 linear = sim$fireSense_SpreadLinear)
+  ## this year's spread probability, with the year's random effect if the fit has one. With a per-fire effect
+  ## (fireSense_SpreadFireSD above 0) the fires spread on the linear predictor, each with its own offset
+  ## (`linkedSpread()`); `spreadProbYear` is then the probability without the per-fire offset, for `smallFires()`.
+  fireSD <- cellValues(sim$fireSense_SpreadFireSD, terra::ncell(sim$fireSense_SpreadPredicted))
+  perFire <- any(fireSD > 0)
+  linked <- if (perFire) linkedSpread(sim$fireSense_SpreadSD, sim$fireSense_SpreadPowerLaw, sim$fireSense_SpreadLinear)
+  spreadProbYear <- if (perFire) linked$prob else
+    yearSpreadProb(sim$fireSense_SpreadPredicted, sim$fireSense_SpreadSD, sim$fireSense_SpreadPowerLaw,
+                   linear = sim$fireSense_SpreadLinear)
 
   ## One fire per escaped ignition, spread with spreadCpp(), the spread the fit uses (fireSenseUtils'
   ## objective), so a forecast spreads fires as the fitted parameters assume: an escaped fire burns its
@@ -255,9 +289,14 @@ burn <- function(sim) {
     fireSenseUtils::escapeSizePixels(Par$escapeSizeHa, sim$fireSense_SpreadPredicted) else 0L
   spreadState <- data.table(initialPixels = integer(), pixels = integer())
   if (length(escLocs)) {
-    ss <- SpaDES.tools::spreadCpp(landscape = sim$fireSense_SpreadPredicted, loci = escLocs,
-                                  spreadProb = spreadProbYear, directions = 8L, minSize = minPx,
-                                  jumpTries = Par$jumpTries, jumpMeanDist = Par$jumpMeanDist)
+    args <- list(landscape = sim$fireSense_SpreadPredicted, loci = escLocs, directions = 8L, minSize = minPx,
+                 jumpTries = Par$jumpTries, jumpMeanDist = Par$jumpMeanDist)
+    args <- c(args, if (perFire) {
+      ## each fire's own offset: N(0, sd of the ELF its start pixel is in), on top of the year's effect in x
+      list(spreadProb = linked$linear, link = "powerLaw", linkPars = linked$pars,
+           linkOffset = stats::rnorm(length(escLocs)) * fireSD[escLocs])
+    } else list(spreadProb = spreadProbYear))
+    ss <- do.call(SpaDES.tools::spreadCpp, args)
     spreadState <- data.table(initialPixels = ss$initialLocus, pixels = ss$indices)
   }
   ## the ignitions that did not escape: a small patch each, sized from the observed small fires
@@ -401,24 +440,42 @@ drawIgnitionsAndEscapes <- function(sim, store, z = NULL) {
   pixelID_igs[randomOrder, ] #Randomize order
 }
 
+#' The starts of every observed escape, the spread fit's
+#'
+#' `fireSenseUtils::escapeFireSet()` with the escape definition (`escapeSizeHa`, `fireCauses`) and `starts = NULL`:
+#' each escape polygon's centroid moved to the nearest burnable pixel of the fire, as the spread fit has it, never an
+#' NFDB point. Starts in the buffer are dropped later, with those of predicted fires (`fireSenseUtils::inELFCore()`).
+#'
+#' @param firePolys Annual fire polygons (a list of `SpatVector`s, or one) with `YEAR`, `POLY_HA` and `FIRECAUS`.
+#' @param flammableRTM `SpatRaster` of the burnable pixels, core and buffer; its cell numbers are `pixelID`.
+#' @param definition The escape definition, from `fireSenseUtils::escapeDefinitionOf()`.
+#'
+#' @return A `data.table` with `YEAR` and `pixelID`, one row per escape.
+observedEscapeStarts <- function(firePolys, flammableRTM, definition) {
+  st <- fireSenseUtils::escapeFireSet(firePolys, flammableRTM, definition = definition)
+  data.table(YEAR = as.integer(st$YEAR), pixelID = as.integer(st$pixelID))
+}
+
 #' A year's observed escapes, as ignitions to spread
 #'
-#' The fires of `year` in `firePoints` that escaped (`fireSenseUtils::escapedFires()`: at least `escapeSizeHa`
-#' and larger than one pixel, the fit's definition), each on the pixel of `landscape` its point falls in.
-#' Points outside `landscape` are dropped. Fires that did not escape are not returned.
-#'
-#' @param firePoints `SpatVector` with columns `YEAR` and `SIZE_HA`, in the CRS of `landscape`.
+#' @param starts The result of `observedEscapeStarts()`.
 #' @param year The fire year.
-#' @param landscape `SpatRaster` whose cell numbers `pixelID` gives.
-#' @param escapeSizeHa Size (ha) a fire must reach to count as escaped.
 #'
-#' @return A `data.table` with `pixelID` and `escaped` (all `TRUE`), one row per escape.
-observedEscapes <- function(firePoints, year, landscape, escapeSizeHa) {
-  pts <- firePoints[which(as.integer(firePoints$YEAR) == year), ]
-  esc <- fireSenseUtils::escapedFires(pts, escapeSizeHa, prod(res(landscape)) / 1e4)
-  cells <- if (nrow(esc)) terra::cellFromXY(landscape, terra::crds(esc)) else integer()
-  cells <- as.integer(cells[!is.na(cells)])
+#' @return A `data.table` with `pixelID` and `escaped` (all `TRUE`), one row per escape of `year` with a start.
+observedEscapes <- function(starts, year) {
+  cells <- starts$pixelID[starts$YEAR == year & !is.na(starts$pixelID)]
   data.table(pixelID = cells, escaped = rep(TRUE, length(cells)))
+}
+
+#' A raster's values, or one number, as a vector of `n`; `NA` is 0 and `NULL` is all 0
+#'
+#' @param x `NULL`, a number or a `SpatRaster` aligned with the landscape.
+#' @param n Number of cells.
+#' @return A numeric vector of length `n`.
+cellValues <- function(x, n) {
+  v <- if (is.null(x)) rep(0, n) else if (inherits(x, "SpatRaster")) terra::values(x, mat = FALSE) else rep_len(x, n)
+  v[is.na(v)] <- 0
+  v
 }
 
 #' Small fires for the ignitions that did not escape
@@ -474,16 +531,60 @@ yearSDLayer <- function(probRas, layer) {
   terra::values(probRas[[layer]], mat = FALSE)
 }
 
+#' The year's random effect on every cell
+#'
+#' eps = z * sd with one z ~ N(0, 1) per call (or `z`). `NULL` when there is no effect: no `sd`, or `sd` 0 everywhere
+#' (and then nothing is drawn).
+#'
+#' @param sd `NULL`, one number, or a `SpatRaster` aligned with the landscape.
+#' @param n Number of cells.
+#' @param z The year's z; `NULL` draws one.
+#' @return A numeric vector of length `n`, or `NULL`.
+yearSpreadEps <- function(sd, n, z = NULL) {
+  if (is.null(sd)) return(NULL)
+  s <- cellValues(sd, n)
+  if (!any(s > 0)) return(NULL)
+  if (is.null(z)) z <- stats::rnorm(1)
+  z * s
+}
+
+#' The power-law link parameters of every cell
+#'
+#' @param powerLaw `fireSense_SpreadPowerLaw`: a numeric vector or `SpatRaster` with `pc`, `gamma`, `floor` and
+#'   `shape` (1, `fireSenseUtils::spreadPowerLawShape`, when absent: a fit made before `shape` existed).
+#' @param n Number of cells.
+#' @return A numeric matrix, `n` rows and columns `pc`, `gamma`, `floor`, `shape`.
+powerLawPars <- function(powerLaw, n) {
+  nms <- c("pc", "gamma", "floor", "shape")
+  one <- function(nm) {
+    if (nm == "shape" && !"shape" %in% names(powerLaw)) return(rep(fireSenseUtils::spreadPowerLawShape, n))
+    if (inherits(powerLaw, "SpatRaster")) terra::values(powerLaw[[nm]], mat = FALSE) else rep_len(powerLaw[[nm]], n)
+  }
+  matrix(unlist(lapply(nms, one)), ncol = 4L, dimnames = list(NULL, nms))
+}
+
+## `fireSenseUtils::powerLawLink()` of the rows of a `powerLawPars()` matrix
+powerLawProb <- function(x, pars)
+  fireSenseUtils::powerLawLink(x, pars[, "pc"], pars[, "gamma"], pars[, "floor"], pars[, "shape"])
+
+## stops unless a power-law fit gave the year effect its linear predictor, which a year effect needs
+needsLinear <- function(linear)
+  if (is.null(linear))
+    stop("fireSense_burn: a power-law spread fit (fireSense_SpreadPowerLaw) with a year or per-fire effect needs ",
+         "fireSense_SpreadLinear, the linear predictor from fireSense_spreadPredict (>= its PR 33). The effect ",
+         "cannot be added to x recovered from fireSense_SpreadPredicted: the link clips low x to p = 0.",
+         call. = FALSE)
+
 #' This year's spread probability, with the per-year random effect
 #'
 #' The fit (`fireSenseUtils::.objfunSpreadFit()` with `yearSpreadSD`) gives each year one eps, shared by all that
 #' year's fires. Here each year draws z ~ N(0, 1), independent of
-#' the ignitions' and escapes' z (`yearZ()`), and uses eps = z * sd. With a raster `sd` (several ELFs, each with
-#' its own fitted sd) the ELFs share the year's z, each scaled by its own sd. Without `powerLaw` eps is added on the
-#' logit: plogis(qlogis(p) + eps). With `powerLaw` (a fit with `spreadLink = "powerLaw"`) eps is added to the linear
-#' predictor x, as in the fit: p is `fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor, shape)` for every pixel with an
-#' x (`linear`). A flammable pixel with a low x has p of 0 in `spreadProbRas` (the link clips it), so x cannot be
-#' recovered from p, and `linear` is required. Pixels without an x (not flammable) keep their p.
+#' the ignitions' and escapes' z (`yearZ()`), and uses eps = z * sd (`yearSpreadEps()`). With a raster `sd` (several
+#' ELFs, each with its own fitted sd) the ELFs share the year's z, each scaled by its own sd. Without `powerLaw` eps is
+#' added on the logit: plogis(qlogis(p) + eps). With `powerLaw` (a fit with `spreadLink = "powerLaw"`) eps is added to
+#' the linear predictor x, as in the fit: p is `fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor, shape)` for every
+#' pixel with an x (`linear`). A flammable pixel with a low x has p of 0 in `spreadProbRas` (the link clips it), so x
+#' cannot be recovered from p, and `linear` is required. Pixels without an x (not flammable) keep their p.
 #'
 #' @param spreadProbRas `SpatRaster` of spread probability.
 #' @param sd `NULL`, one number, or a `SpatRaster` aligned with `spreadProbRas`.
@@ -495,30 +596,43 @@ yearSDLayer <- function(probRas, layer) {
 #' @return Numeric vector of spread probability, one per pixel.
 yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL, linear = NULL) {
   p <- terra::values(spreadProbRas, mat = FALSE)
-  if (is.null(sd)) return(p)
-  s <- if (inherits(sd, "SpatRaster")) terra::values(sd, mat = FALSE) else rep_len(sd, length(p))
-  s[is.na(s)] <- 0
-  if (!any(s > 0)) return(p)
-  if (is.null(z)) z <- stats::rnorm(1)
-  if (is.null(powerLaw)) return(stats::plogis(stats::qlogis(p) + z * s))
+  eps <- yearSpreadEps(sd, length(p), z)
+  if (is.null(eps)) return(p)
+  if (is.null(powerLaw)) return(stats::plogis(stats::qlogis(p) + eps))
 
-  if (is.null(linear))
-    stop("fireSense_burn: a power-law spread fit (fireSense_SpreadPowerLaw) with a year effect needs ",
-         "fireSense_SpreadLinear, the linear predictor from fireSense_spreadPredict (>= its PR 33). The year ",
-         "effect cannot be added to x recovered from fireSense_SpreadPredicted: the link clips low x to p = 0.",
-         call. = FALSE)
-  x <- terra::values(linear, mat = FALSE)
-
-  ## a parameter per pixel: a raster's layer, or one number for all
-  par1 <- function(nm) if (inherits(powerLaw, "SpatRaster")) terra::values(powerLaw[[nm]], mat = FALSE)
-                       else rep_len(powerLaw[[nm]], length(p))
-  pc <- par1("pc"); gamma <- par1("gamma"); flr <- par1("floor")
-  ## `shape` came with fireSenseUtils 0.2.3.9138; a fit's parameters without it are the original link
-  hasShape <- "shape" %in% names(powerLaw)
-  shape <- if (hasShape) par1("shape") else rep_len(fireSenseUtils::spreadPowerLawShape, length(p))
-  ok <- !is.na(x) & !is.na(pc) & !is.na(gamma) & !is.na(flr) & !is.na(shape)
-  p[ok] <- fireSenseUtils::powerLawLink(x[ok] + z * s[ok], pc[ok], gamma[ok], flr[ok], shape[ok])
+  linked <- linkedSpread(sd, powerLaw, linear, eps = eps)
+  ok <- !is.na(linked$linear)
+  p[ok] <- linked$prob[ok]
   p
+}
+
+#' The year's linear predictor and link parameters, for spreading fires with a per-fire effect
+#'
+#' With a per-fire effect each fire has its own offset on x (`SpaDES.tools::spreadCpp(link = "powerLaw")`), so the
+#' fires spread on x, not on p. The year's effect (`yearSpreadEps()`, one z, as in `yearSpreadProb()`) is added to the
+#' x of every cell here, so an `sd` per ELF is each ELF's own; the per-fire offsets are added by `spreadCpp()`.
+#' Cells with no x or no link parameters are unburnable (`pc = floor = 0`, as `spreadCpp()` wants no `NA` rows).
+#'
+#' @inheritParams yearSpreadProb
+#' @param eps The year's effect on every cell; default `yearSpreadEps(sd, <number of cells>)`, which draws a z.
+#'   `yearSpreadProb()` passes the one it has drawn.
+#' @return A list: `linear` (x + eps, `NA` where unburnable), `pars` (`powerLawPars()` per cell) and `prob` (the
+#'   probability of each cell without a per-fire offset, `NA` where unburnable).
+linkedSpread <- function(sd, powerLaw, linear, eps = yearSpreadEps(sd, length(x))) {
+  if (is.null(powerLaw))
+    stop("fireSense_burn: a per-fire spread effect (fireSense_SpreadFireSD) needs fireSense_SpreadPowerLaw: it is ",
+         "fitted only with spreadLink = \"powerLaw\"", call. = FALSE)
+  needsLinear(linear)
+  x <- terra::values(linear, mat = FALSE)
+  pars <- powerLawPars(powerLaw, length(x))
+  if (!is.null(eps)) x <- x + eps
+  bad <- is.na(x) | is.na(rowSums(pars))
+  x[bad] <- NA
+  pars[bad, c("pc", "floor")] <- 0
+  pars[bad, c("gamma", "shape")] <- 1
+  prob <- powerLawProb(ifelse(bad, 0, x), pars)
+  prob[bad] <- NA
+  list(linear = x, pars = pars, prob = prob)
 }
 
 #' Which coarse cell each fine cell falls in
