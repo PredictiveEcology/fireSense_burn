@@ -16,17 +16,20 @@ test_that("inputs are the expected names and classes", {
   inputs <- stats::setNames(md$inputObjects$objectClass, md$inputObjects$objectName)
   expect_identical(
     inputs[order(names(inputs))],
-    c(fireSense_IgAndEscapeDistribution = "list",
+    c(firePolys                         = "list",
+      fireSense_EscapeDefinition        = "data.table",
+      fireSense_IgAndEscapeDistribution = "list",
       fireSense_IgAndEscapeProbRas      = "SpatRaster",
+      fireSense_SpreadFireSD            = "SpatRaster|numeric",
       fireSense_SpreadLinear            = "SpatRaster",
       fireSense_SpreadPowerLaw          = "SpatRaster|numeric",
       fireSense_SpreadPredicted         = "SpatRaster",
       fireSense_SpreadSD                = "SpatRaster|numeric",
       flammableRTM                      = "SpatRaster",
-      ignitionFirePoints                = "SpatVector",
       ignitionFitRTM                    = "SpatRaster",
       nonEscapedFireSizesHa             = "numeric",
       rasterToMatch                     = "SpatRaster",
+      rasterToMatchLargeELF             = "SpatRaster",
       studyArea                         = "SpatVector")
   )
 })
