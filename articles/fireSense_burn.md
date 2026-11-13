@@ -1,7 +1,7 @@
 ---
 title: "fireSense_burn Manual"
 subtitle: "v.0.0.0.9000"
-date: "Last updated: 2026-11-11"
+date: "Last updated: 2026-11-13"
 output:
   bookdown::html_document2:
     toc: true
@@ -73,15 +73,21 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
+   <td style="text-align:left;"> fireSense_SpreadLink </td>
+   <td style="text-align:left;"> character </td>
+   <td style="text-align:left;"> From fireSense_spreadPredict, only for a fit made with `spreadLink = "powerLaw"`, `"powerLawSmooth"` or `"richards"`: the link the ledger row records, which `fireSense_SpreadPowerLaw` holds the parameters of. NULL with `fireSense_SpreadPowerLaw`: "powerLaw" (spreadPredict before it had the others). </td>
+   <td style="text-align:left;"> NA </td>
+  </tr>
+  <tr>
    <td style="text-align:left;"> fireSense_SpreadPowerLaw </td>
    <td style="text-align:left;"> SpatRaster&amp;#124;numeric </td>
-   <td style="text-align:left;"> From fireSense_spreadPredict, only for a fit made with `spreadLink = "powerLaw"`: `pc`, `gamma` and `floor` (and `shape`, 1 if absent) of `fireSenseUtils::powerLawLink()`, as a numeric vector with these names (one ELF) or a raster aligned with `fireSense_SpreadPredicted`. The year effect is then added to the linear predictor x, as in the fit: p = powerLawLink(x + z sd), with x from `fireSense_SpreadLinear`. NULL: the effect is added on the logit. </td>
+   <td style="text-align:left;"> From fireSense_spreadPredict, only for a fit made with `spreadLink = "powerLaw"`, `"powerLawSmooth"` or `"richards"`: the parameters of the link `fireSense_SpreadLink`, named as `fireSenseUtils::spreadLinkParNames` says ("powerLaw": `pc`, `gamma`, `floor` and `shape`, 1 if absent, of `fireSenseUtils::powerLawLink()`; "powerLawSmooth" also `lower`; "richards": `pc`, `lower`, `nu`, `B`), as a numeric vector with these names (one ELF) or a raster aligned with `fireSense_SpreadPredicted`. The year effect is then added to the linear predictor x, as in the fit: p = link(x + z sd) (`fireSenseUtils::linearLinkProb()`), with x from `fireSense_SpreadLinear`. NULL: the effect is added on the logit. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
    <td style="text-align:left;"> fireSense_SpreadLinear </td>
    <td style="text-align:left;"> SpatRaster </td>
-   <td style="text-align:left;"> From fireSense_spreadPredict, only for a fit made with `spreadLink = "powerLaw"`: the linear predictor x of each flammable pixel, aligned with `fireSense_SpreadPredicted`. Required whenever `fireSense_SpreadPowerLaw` is set and the year effect is above 0: the link clips a pixel with a low x to p = 0, so x cannot be recovered from p, yet the fit adds the year effect to x of every pixel. </td>
+   <td style="text-align:left;"> From fireSense_spreadPredict, only for a fit made with `spreadLink = "powerLaw"`: the linear predictor x of each flammable pixel, aligned with `fireSense_SpreadPredicted`. Required whenever `fireSense_SpreadPowerLaw` is set and the year effect is above 0: the power law clips a pixel with a low x to p = 0, so x cannot be recovered from p, yet the fit adds the year effect to x of every pixel. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
@@ -111,7 +117,7 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
   <tr>
    <td style="text-align:left;"> fireSense_SpreadFireSD </td>
    <td style="text-align:left;"> SpatRaster&amp;#124;numeric </td>
-   <td style="text-align:left;"> From fireSense_spreadPredict: the sd of the per-fire random effect on the linear predictor x of a spread fit made with `spreadLink = "powerLaw"` (`fireSpreadSD`), a raster aligned with `fireSense_SpreadPredicted` (per ELF) or one number. Above 0, each fire spreads with its own offset ~ N(0, sd) on x, with the link parameters of its pixel (`SpaDES.tools::spreadCpp(link =)`), which needs `fireSense_SpreadPowerLaw` and `fireSense_SpreadLinear`. NULL or 0: no effect, and the spread is that of earlier versions. </td>
+   <td style="text-align:left;"> From fireSense_spreadPredict: the sd of the per-fire random effect on the linear predictor x of a spread fit made with `spreadLink = "powerLaw"`, `"powerLawSmooth"` or `"richards"` (`fireSpreadSD`), a raster aligned with `fireSense_SpreadPredicted` (per ELF) or one number. Above 0, each fire spreads with its own offset ~ N(0, sd) on x, with the link parameters of its pixel (`SpaDES.tools::spreadCpp(link =)`), which needs `fireSense_SpreadPowerLaw` and `fireSense_SpreadLinear`. NULL or 0: no effect, and the spread is that of earlier versions. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
