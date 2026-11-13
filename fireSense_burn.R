@@ -73,16 +73,23 @@ defineModule(sim, list(
                        "(from fireSense_spreadPredict, per ELF) or one number. Each year draws one z ~ N(0, 1), independent of the",
                        "z that scales that year's ignitions and escapes (`fireSense_IgAndEscapeProbRas`); all of that",
                        "year's fires spread with plogis(qlogis(p) + z * sd). NULL or 0: no effect.")),
+    expectsInput("fireSense_SpreadLink", "character",
+                 paste("From fireSense_spreadPredict, only for a fit made with `spreadLink = \"powerLaw\"`, `\"powerLawSmooth\"` or",
+                       "`\"richards\"`: the link the ledger row records, which `fireSense_SpreadPowerLaw` holds the parameters of.",
+                       "NULL with `fireSense_SpreadPowerLaw`: \"powerLaw\" (spreadPredict before it had the others).")),
     expectsInput("fireSense_SpreadPowerLaw", "SpatRaster|numeric",
-                 paste("From fireSense_spreadPredict, only for a fit made with `spreadLink = \"powerLaw\"`: `pc`, `gamma` and",
-                       "`floor` (and `shape`, 1 if absent) of `fireSenseUtils::powerLawLink()`, as a numeric vector with these names (one ELF) or a",
+                 paste("From fireSense_spreadPredict, only for a fit made with `spreadLink = \"powerLaw\"`, `\"powerLawSmooth\"` or",
+                       "`\"richards\"`: the parameters of the link `fireSense_SpreadLink`, named as",
+                       "`fireSenseUtils::spreadLinkParNames` says (\"powerLaw\": `pc`, `gamma`, `floor` and `shape`, 1 if absent, of",
+                       "`fireSenseUtils::powerLawLink()`; \"powerLawSmooth\" also `lower`; \"richards\": `pc`, `lower`, `nu`, `B`), as a",
+                       "numeric vector with these names (one ELF) or a",
                        "raster aligned with `fireSense_SpreadPredicted`. The year effect is then added to the linear",
-                       "predictor x, as in the fit: p = powerLawLink(x + z * sd), with x from `fireSense_SpreadLinear`.",
-                       "NULL: the effect is added on the logit.")),
+                       "predictor x, as in the fit: p = link(x + z * sd) (`fireSenseUtils::linearLinkProb()`), with x from",
+                       "`fireSense_SpreadLinear`. NULL: the effect is added on the logit.")),
     expectsInput("fireSense_SpreadLinear", "SpatRaster",
                  paste("From fireSense_spreadPredict, only for a fit made with `spreadLink = \"powerLaw\"`: the linear",
                        "predictor x of each flammable pixel, aligned with `fireSense_SpreadPredicted`. Required whenever",
-                       "`fireSense_SpreadPowerLaw` is set and the year effect is above 0: the link clips a pixel with a low x",
+                       "`fireSense_SpreadPowerLaw` is set and the year effect is above 0: the power law clips a pixel with a low x",
                        "to p = 0, so x cannot be recovered from p, yet the fit adds the year effect to x of every pixel.")),
     expectsInput("flammableRTM", "SpatRaster", 
                  "Binary SpatRaster (1 = flammable, 0 = not). Non-flammable pixels are `NA` in `burnMap`."),
@@ -101,7 +108,7 @@ defineModule(sim, list(
                        "`FIRECAUS`), as in fireSense_dataPrepFit.")),
     expectsInput("fireSense_SpreadFireSD", "SpatRaster|numeric",
                  paste("From fireSense_spreadPredict: the sd of the per-fire random effect on the linear predictor x of a",
-                       "spread fit made with `spreadLink = \"powerLaw\"` (`fireSpreadSD`), a raster aligned with",
+                       "spread fit made with `spreadLink = \"powerLaw\"`, `\"powerLawSmooth\"` or `\"richards\"` (`fireSpreadSD`), a raster aligned with",
                        "`fireSense_SpreadPredicted` (per ELF) or one number. Above 0, each fire spreads with its own",
                        "offset ~ N(0, sd) on x, with the link parameters of its pixel (`SpaDES.tools::spreadCpp(link =)`),",
                        "which needs `fireSense_SpreadPowerLaw` and `fireSense_SpreadLinear`. NULL or 0: no effect, and the",
@@ -275,10 +282,11 @@ burn <- function(sim) {
   ## (`linkedSpread()`); `spreadProbYear` is then the probability without the per-fire offset, for `smallFires()`.
   fireSD <- cellValues(sim$fireSense_SpreadFireSD, terra::ncell(sim$fireSense_SpreadPredicted))
   perFire <- any(fireSD > 0)
-  linked <- if (perFire) linkedSpread(sim$fireSense_SpreadSD, sim$fireSense_SpreadPowerLaw, sim$fireSense_SpreadLinear)
+  linked <- if (perFire) linkedSpread(sim$fireSense_SpreadSD, sim$fireSense_SpreadPowerLaw, sim$fireSense_SpreadLinear,
+                                      link = sim$fireSense_SpreadLink)
   spreadProbYear <- if (perFire) linked$prob else
     yearSpreadProb(sim$fireSense_SpreadPredicted, sim$fireSense_SpreadSD, sim$fireSense_SpreadPowerLaw,
-                   linear = sim$fireSense_SpreadLinear)
+                   linear = sim$fireSense_SpreadLinear, link = sim$fireSense_SpreadLink)
 
   ## One fire per escaped ignition, spread with spreadCpp(), the spread the fit uses (fireSenseUtils'
   ## objective), so a forecast spreads fires as the fitted parameters assume: an escaped fire burns its
@@ -293,7 +301,7 @@ burn <- function(sim) {
                  jumpTries = Par$jumpTries, jumpMeanDist = Par$jumpMeanDist)
     args <- c(args, if (perFire) {
       ## each fire's own offset: N(0, sd of the ELF its start pixel is in), on top of the year's effect in x
-      list(spreadProb = linked$linear, link = "powerLaw", linkPars = linked$pars,
+      list(spreadProb = linked$linear, link = linked$link, linkPars = linked$pars,
            linkOffset = stats::rnorm(length(escLocs)) * fireSD[escLocs])
     } else list(spreadProb = spreadProbYear))
     ss <- do.call(SpaDES.tools::spreadCpp, args)
@@ -548,31 +556,33 @@ yearSpreadEps <- function(sd, n, z = NULL) {
   z * s
 }
 
-#' The power-law link parameters of every cell
+#' The link parameters of every cell
 #'
-#' @param powerLaw `fireSense_SpreadPowerLaw`: a numeric vector or `SpatRaster` with `pc`, `gamma`, `floor` and
-#'   `shape` (1, `fireSenseUtils::spreadPowerLawShape`, when absent: a fit made before `shape` existed).
+#' @param powerLaw `fireSense_SpreadPowerLaw`: a numeric vector or `SpatRaster` with the parameters of `link`
+#'   (`fireSenseUtils::spreadLinkParNames`); for `"powerLaw"`, `shape` is 1 (`fireSenseUtils::spreadPowerLawShape`) when absent: a
+#'   fit made before `shape` existed.
 #' @param n Number of cells.
-#' @return A numeric matrix, `n` rows and columns `pc`, `gamma`, `floor`, `shape`.
-powerLawPars <- function(powerLaw, n) {
-  nms <- c("pc", "gamma", "floor", "shape")
+#' @param link `fireSense_SpreadLink`; `NULL` is `"powerLaw"`.
+#' @return A numeric matrix, `n` rows and a column per parameter of the link: `pc`, `gamma`, `floor`, `shape` for `"powerLaw"`.
+powerLawPars <- function(powerLaw, n, link = NULL) {
+  nms <- fireSenseUtils::spreadLinkParNames[[if (is.null(link)) "powerLaw" else link]]
   one <- function(nm) {
     if (nm == "shape" && !"shape" %in% names(powerLaw)) return(rep(fireSenseUtils::spreadPowerLawShape, n))
     if (inherits(powerLaw, "SpatRaster")) terra::values(powerLaw[[nm]], mat = FALSE) else rep_len(powerLaw[[nm]], n)
   }
-  matrix(unlist(lapply(nms, one)), ncol = 4L, dimnames = list(NULL, nms))
+  matrix(unlist(lapply(nms, one)), ncol = length(nms), dimnames = list(NULL, nms))
 }
 
-## `fireSenseUtils::powerLawLink()` of the rows of a `powerLawPars()` matrix
-powerLawProb <- function(x, pars)
-  fireSenseUtils::powerLawLink(x, pars[, "pc"], pars[, "gamma"], pars[, "floor"], pars[, "shape"])
+## The parameters of a cell that cannot burn (no x, or no link parameters): spreadCpp() wants no `NA` in `linkPars`, and
+## the cell's `NA` linear predictor already makes it unburnable. Valid for every link (`lower` 0 is within 0 and `floor`/`pc`).
+unburnablePars <- c(pc = 0, gamma = 1, floor = 0, shape = 1, lower = 0, nu = 0, B = 1)
 
 ## stops unless a power-law fit gave the year effect its linear predictor, which a year effect needs
 needsLinear <- function(linear)
   if (is.null(linear))
-    stop("fireSense_burn: a power-law spread fit (fireSense_SpreadPowerLaw) with a year or per-fire effect needs ",
+    stop("fireSense_burn: a power-law or Richards spread fit (fireSense_SpreadPowerLaw) with a year or per-fire effect needs ",
          "fireSense_SpreadLinear, the linear predictor from fireSense_spreadPredict (>= its PR 33). The effect ",
-         "cannot be added to x recovered from fireSense_SpreadPredicted: the link clips low x to p = 0.",
+         "cannot be added to x recovered from fireSense_SpreadPredicted: the power law clips low x to p = 0.",
          call. = FALSE)
 
 #' This year's spread probability, with the per-year random effect
@@ -581,9 +591,10 @@ needsLinear <- function(linear)
 #' year's fires. Here each year draws z ~ N(0, 1), independent of
 #' the ignitions' and escapes' z (`yearZ()`), and uses eps = z * sd (`yearSpreadEps()`). With a raster `sd` (several
 #' ELFs, each with its own fitted sd) the ELFs share the year's z, each scaled by its own sd. Without `powerLaw` eps is
-#' added on the logit: plogis(qlogis(p) + eps). With `powerLaw` (a fit with `spreadLink = "powerLaw"`) eps is added to
-#' the linear predictor x, as in the fit: p is `fireSenseUtils::powerLawLink(x + eps, pc, gamma, floor, shape)` for every
-#' pixel with an x (`linear`). A flammable pixel with a low x has p of 0 in `spreadProbRas` (the link clips it), so x
+#' added on the logit: plogis(qlogis(p) + eps). With `powerLaw` (a fit with `spreadLink = "powerLaw"`, `"powerLawSmooth"` or
+#' `"richards"`) eps is added to the linear predictor x, as in the fit: p is the link
+#' (`fireSenseUtils::linearLinkProb()`) of `x + eps` with the pixel's parameters, for every
+#' pixel with an x (`linear`). With `"powerLaw"` a flammable pixel with a low x has p of 0 in `spreadProbRas` (the link clips it), so x
 #' cannot be recovered from p, and `linear` is required. Pixels without an x (not flammable) keep their p.
 #'
 #' @param spreadProbRas `SpatRaster` of spread probability.
@@ -592,15 +603,16 @@ needsLinear <- function(linear)
 #'   `pc`, `gamma`, `floor` and `shape` (1 when absent).
 #' @param linear `fireSense_SpreadLinear`: the linear predictor x, a `SpatRaster` aligned with `spreadProbRas`; required
 #'   with `powerLaw` (and an `sd` above 0), else the function stops.
+#' @param link `fireSense_SpreadLink`: the link `powerLaw` holds the parameters of; `NULL` is `"powerLaw"`.
 #' @param z The year's z; `NULL` (what `burn` passes) draws one here.
 #' @return Numeric vector of spread probability, one per pixel.
-yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL, linear = NULL) {
+yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL, linear = NULL, link = NULL) {
   p <- terra::values(spreadProbRas, mat = FALSE)
   eps <- yearSpreadEps(sd, length(p), z)
   if (is.null(eps)) return(p)
   if (is.null(powerLaw)) return(stats::plogis(stats::qlogis(p) + eps))
 
-  linked <- linkedSpread(sd, powerLaw, linear, eps = eps)
+  linked <- linkedSpread(sd, powerLaw, linear, eps = eps, link = link)
   ok <- !is.na(linked$linear)
   p[ok] <- linked$prob[ok]
   p
@@ -608,31 +620,31 @@ yearSpreadProb <- function(spreadProbRas, sd, powerLaw = NULL, z = NULL, linear 
 
 #' The year's linear predictor and link parameters, for spreading fires with a per-fire effect
 #'
-#' With a per-fire effect each fire has its own offset on x (`SpaDES.tools::spreadCpp(link = "powerLaw")`), so the
+#' With a per-fire effect each fire has its own offset on x (`SpaDES.tools::spreadCpp(link = )`), so the
 #' fires spread on x, not on p. The year's effect (`yearSpreadEps()`, one z, as in `yearSpreadProb()`) is added to the
 #' x of every cell here, so an `sd` per ELF is each ELF's own; the per-fire offsets are added by `spreadCpp()`.
-#' Cells with no x or no link parameters are unburnable (`pc = floor = 0`, as `spreadCpp()` wants no `NA` rows).
+#' Cells with no x or no link parameters are unburnable (`unburnablePars`, as `spreadCpp()` wants no `NA` rows).
 #'
 #' @inheritParams yearSpreadProb
 #' @param eps The year's effect on every cell; default `yearSpreadEps(sd, <number of cells>)`, which draws a z.
 #'   `yearSpreadProb()` passes the one it has drawn.
-#' @return A list: `linear` (x + eps, `NA` where unburnable), `pars` (`powerLawPars()` per cell) and `prob` (the
-#'   probability of each cell without a per-fire offset, `NA` where unburnable).
-linkedSpread <- function(sd, powerLaw, linear, eps = yearSpreadEps(sd, length(x))) {
+#' @return A list: `link` (the link's name, for `spreadCpp(link =)`), `linear` (x + eps, `NA` where unburnable), `pars`
+#'   (`powerLawPars()` per cell) and `prob` (the probability of each cell without a per-fire offset, `NA` where unburnable).
+linkedSpread <- function(sd, powerLaw, linear, eps = yearSpreadEps(sd, length(x)), link = NULL) {
   if (is.null(powerLaw))
     stop("fireSense_burn: a per-fire spread effect (fireSense_SpreadFireSD) needs fireSense_SpreadPowerLaw: it is ",
-         "fitted only with spreadLink = \"powerLaw\"", call. = FALSE)
+         "fitted only with spreadLink = \"powerLaw\", \"powerLawSmooth\" or \"richards\"", call. = FALSE)
   needsLinear(linear)
+  if (is.null(link)) link <- "powerLaw"
   x <- terra::values(linear, mat = FALSE)
-  pars <- powerLawPars(powerLaw, length(x))
+  pars <- powerLawPars(powerLaw, length(x), link)
   if (!is.null(eps)) x <- x + eps
   bad <- is.na(x) | is.na(rowSums(pars))
   x[bad] <- NA
-  pars[bad, c("pc", "floor")] <- 0
-  pars[bad, c("gamma", "shape")] <- 1
-  prob <- powerLawProb(ifelse(bad, 0, x), pars)
+  pars[bad, ] <- rep(unburnablePars[colnames(pars)], each = sum(bad))
+  prob <- fireSenseUtils::linearLinkProb(ifelse(bad, 0, x), link, pars)
   prob[bad] <- NA
-  list(linear = x, pars = pars, prob = prob)
+  list(link = link, linear = x, pars = pars, prob = prob)
 }
 
 #' Which coarse cell each fine cell falls in

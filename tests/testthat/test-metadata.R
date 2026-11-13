@@ -22,6 +22,7 @@ test_that("inputs are the expected names and classes", {
       fireSense_IgAndEscapeProbRas      = "SpatRaster",
       fireSense_SpreadFireSD            = "SpatRaster|numeric",
       fireSense_SpreadLinear            = "SpatRaster",
+      fireSense_SpreadLink              = "character",
       fireSense_SpreadPowerLaw          = "SpatRaster|numeric",
       fireSense_SpreadPredicted         = "SpatRaster",
       fireSense_SpreadSD                = "SpatRaster|numeric",
@@ -93,13 +94,13 @@ test_that("required packages are unchanged", {
     unlist(md$reqdPkgs),
     c(
       "data.table",
-      "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9142)",
+      "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9158)",
       "ggplot2",
       "ggspatial",
       "httr2",
       "PredictiveEcology/reproducible@development",
       "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
-      "PredictiveEcology/SpaDES.tools@development (>= 2.1.3.9009)",
+      "PredictiveEcology/SpaDES.tools@development (>= 2.2.0.9003)",
       "terra"
     )
   )
