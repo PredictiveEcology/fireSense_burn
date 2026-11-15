@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">fireSense_burn</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9016</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9017</span>
       </span>
     </div>
 
@@ -91,9 +91,17 @@
         </td>
         <td><p>An empty burn raster</p></td>
       </tr><tr><td>
+          <p><code><a href="escapePixelsOf.html">escapePixelsOf()</a></code> </p>
+        </td>
+        <td><p>Pixels an escaped fire burns first: <code><a href="https://rdrr.io/pkg/fireSenseUtils/man/escapeSizePixels.html" class="external-link">fireSenseUtils::escapeSizePixels()</a></code>, 0 without an escape size</p></td>
+      </tr><tr><td>
           <p><code><a href="fineCoarseTable.html">fineCoarseTable()</a></code> </p>
         </td>
         <td><p>The fine cells and their coarse cells, for one year</p></td>
+      </tr><tr><td>
+          <p><code><a href="ignitionsFromBurnSummary.html">ignitionsFromBurnSummary()</a></code> </p>
+        </td>
+        <td><p>A hindcast's ignitions per rep, rebuilt from its fires</p></td>
       </tr><tr><td>
           <p><code><a href="linkedSpread.html">linkedSpread()</a></code> </p>
         </td>
@@ -114,6 +122,26 @@
           <p><code><a href="powerLawPars.html">powerLawPars()</a></code> </p>
         </td>
         <td><p>The link parameters of every cell</p></td>
+      </tr><tr><td>
+          <p><code><a href="readReplayIgnitions.html">readReplayIgnitions()</a></code> </p>
+        </td>
+        <td><p>Every rep's ignitions of a reference hindcast</p></td>
+      </tr><tr><td>
+          <p><code><a href="replayIgnitionsFile.html">replayIgnitionsFile</a></code> </p>
+        </td>
+        <td><p>The file of a hindcast's ignitions per rep, for <code>ignitionSource = "replay"</code></p></td>
+      </tr><tr><td>
+          <p><code><a href="replayRep.html">replayRep()</a></code> </p>
+        </td>
+        <td><p>The rep of a burn event in a hindcast</p></td>
+      </tr><tr><td>
+          <p><code><a href="replayedIgnitions.html">replayedIgnitions()</a></code> </p>
+        </td>
+        <td><p>One rep's ignitions of a reference hindcast</p></td>
+      </tr><tr><td>
+          <p><code><a href="saveReplayIgnitions.html">saveReplayIgnitions()</a></code> </p>
+        </td>
+        <td><p>Add this rep's ignitions to the replay file</p></td>
       </tr><tr><td>
           <p><code><a href="smallFires.html">smallFires()</a></code> </p>
         </td>
