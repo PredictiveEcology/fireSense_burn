@@ -109,7 +109,9 @@ defineModule(sim, list(
                        "Optional layers `ignitionYearSD` and `escapeYearSD`: the sd of the year effect of each; a year",
                        "multiplies the means by exp(sd * z - sd^2 / 2), with the year's z, which spread does not share.",
                        "Absent or 0: no year effect. Optional layers `ignitionYearEffect` and `escapeYearEffect`: the",
-                       "year's fitted multipliers, used instead with `yearEffects = \"fitted\"`.")),
+                       "year's fitted multipliers, used instead with `yearEffects = \"fitted\"`, and",
+                       "`ignitionYearEffectShape` and `escapeYearEffectShape`, the shapes of their gamma posteriors, from",
+                       "which each rep-year draws its multiplier (`yearMultipliers()`).")),
     expectsInput("fireSense_IgAndEscapeDistribution", "list",
                  paste("`list(ignition = , escape = )`, from fireSense_ignitionPredict: the objective the ignition and",
                        "escape models were fitted with. Only `\"count:poisson\"` can be drawn from.")),
@@ -273,9 +275,10 @@ burn <- function(sim) {
     sim$ignitionsAndEscapes <- observedEscapes(mod$observedStarts, floor(time(sim) + 1e-9))
   } else {
     z <- yearZ(sim$fireSense_IgAndEscapeProbRas)
-    if (!is.null(sim$fireSense_IgAndEscapeProbRas))
-      sim$ignitionsAndEscapes <- drawIgnitionsAndEscapes(sim, store = mod, z = z,
-                                                         fitted = identical(Par$yearEffects, "fitted"))
+    if (!is.null(sim$fireSense_IgAndEscapeProbRas)) {
+      fitted <- fittedYearEffectsUsed(sim$fireSense_IgAndEscapeProbRas, Par$yearEffects, mod, floor(time(sim) + 1e-9))
+      sim$ignitionsAndEscapes <- drawIgnitionsAndEscapes(sim, store = mod, z = z, fitted = fitted)
+    }
   }
 
   ## A fire starts only in the core (the buffer removes edge effects, it has no fires of its own): the ignition
@@ -546,8 +549,12 @@ yearZ <- function(probRas) {
 #'
 #' `fireSenseUtils::yearEffectMultiplier()` of each sd layer (`yearSDLayer()`) and the year's z (1 without z). With
 #' `fitted`, a cell's fitted multiplier (layers `ignitionYearEffect` and `escapeYearEffect`, from
-#' fireSense_ignitionPredict) replaces it where it is not `NA`: a hindcast of a fit year then expects that year's
-#' fitted target counts (fireSense_ignitionFit's `fittedYearEffects()`).
+#' fireSense_ignitionPredict) replaces it where it is not `NA`, times a draw from its posterior: with the layer
+#' `<process>YearEffectShape`, `w = qgamma(p, shape, rate = shape)` (mean 1), one uniform `p` per call and
+#' process, shared by every cell (several ELFs share it, as they share z), so each rep-year draws its own effect
+#' and the reps keep the uncertainty of the year's effect (fireSense_ignitionFit's `fittedYearEffects()`).
+#' `shape` `NA`, or no shape layer: `w = 1`. The uniforms are drawn only when there is a fitted layer, so the
+#' random numbers of `fitted = FALSE` are unchanged.
 #'
 #' @param probRas `fireSense_IgAndEscapeProbRas`.
 #' @param z The year's z (`yearZ()`), or `NULL`.
@@ -560,11 +567,41 @@ yearMultipliers <- function(probRas, z, fitted = FALSE) {
     layer <- paste0(process, "YearEffect")
     if (fitted && layer %in% names(probRas)) {
       f <- terra::values(probRas[[layer]], mat = FALSE)
-      m[!is.na(f)] <- f[!is.na(f)]
+      has <- !is.na(f)
+      shapeLayer <- paste0(layer, "Shape")
+      if (any(has) && shapeLayer %in% names(probRas)) {
+        shape <- terra::values(probRas[[shapeLayer]], mat = FALSE)
+        p <- stats::runif(1)
+        drawn <- has & !is.na(shape)
+        f[drawn] <- f[drawn] * stats::qgamma(p, shape[drawn], rate = shape[drawn])
+      }
+      m[has] <- f[has]
     }
     m
   }
   list(ignition = one("ignition"), escape = one("escape"))
+}
+
+#' Whether this year's draw uses fitted year effects
+#'
+#' `TRUE` with `yearEffects = "fitted"`. When `fireSense_IgAndEscapeProbRas` then has no fitted effect for the year
+#' (no `ignitionYearEffect`/`escapeYearEffect` layer, or only `NA`: a fit stored before fireSense_ignitionFit had
+#' `yearEffects`, or a year outside the fit years), a message says the draw is used, once per run (`store`).
+#'
+#' @param ras `fireSense_IgAndEscapeProbRas`.
+#' @param yearEffects The `yearEffects` parameter.
+#' @param store The module's `mod`, which remembers the message.
+#' @param year The fire year, for the message.
+#' @return Logical.
+fittedYearEffectsUsed <- function(ras, yearEffects, store, year) {
+  if (!identical(yearEffects, "fitted")) return(FALSE)
+  layers <- intersect(c("ignitionYearEffect", "escapeYearEffect"), names(ras))
+  if ((!length(layers) || all(is.na(terra::values(ras[[layers]], mat = FALSE)))) && !isTRUE(store$noFittedMessage)) {
+    message("fireSense_burn: yearEffects = \"fitted\", but the fits have no fitted year effect for ", year,
+            " (fits stored before fireSense_ignitionFit had them have none until refit); the year effect is drawn")
+    store$noFittedMessage <- TRUE
+  }
+  TRUE
 }
 
 #' One year-effect sd layer of `fireSense_IgAndEscapeProbRas`, as a vector; 0 where it is absent

@@ -5,9 +5,11 @@
 coarse <- function() terra::rast(nrows = 2, ncols = 2, xmin = 0, xmax = 2500, ymin = 0, ymax = 2500, crs = "EPSG:3005")
 
 ## the surface with sd layers and, unless NULL, fitted-effect layers (one value or one per coarse cell; NA: none)
-fittedRas <- function(ig = 0.5, esc = 0.3, igSD = 0.6, escSD = 0.9, igEff = 1.6, escEff = 1.4) {
+fittedRas <- function(ig = 0.5, esc = 0.3, igSD = 0.6, escSD = 0.9, igEff = 1.6, escEff = 1.4,
+                      igShape = NULL, escShape = NULL) {
   vals <- list(ignitionProb = ig, escapeProb = esc, ignitionYearSD = igSD, escapeYearSD = escSD,
-               ignitionYearEffect = igEff, escapeYearEffect = escEff)
+               ignitionYearEffect = igEff, escapeYearEffect = escEff,
+               ignitionYearEffectShape = igShape, escapeYearEffectShape = escShape)
   vals <- vals[!vapply(vals, is.null, logical(1))]
   r <- terra::rast(lapply(vals, function(v) terra::setValues(coarse(), rep_len(v, 4))))
   names(r) <- names(vals)
@@ -72,8 +74,39 @@ test_that("in the burn event, yearEffects = \"fitted\" uses the layers; the defa
   withLayers <- fittedRas(ig = 2, esc = 1)
   without <- withLayers[[c("ignitionProb", "escapeProb", "ignitionYearSD", "escapeYearSD")]]
   expect_identical(burnWith(withLayers), burnWith(without))
+  ## the posterior layers do not change the default's random numbers either
+  expect_identical(burnWith(fittedRas(ig = 2, esc = 1, igShape = 30, escShape = 8)), burnWith(without))
   fitted <- burnWith(withLayers, list(yearEffects = "fitted"))
   expect_equal(unique(fitted[[2]]$igProb), 2 * 1.6)
   expect_equal(unique(fitted[[2]]$escapeProb), 1 * 1.4)
   expect_error(runFireSense(NULL, params = list(yearEffects = "fit")), "yearEffects must be")
+})
+
+test_that("with posterior shapes each rep-year draws its multiplier: mean the fitted one, the posterior's spread", {
+  ras <- fittedRas(igEff = c(1.6, NA, 1.6, NA), igShape = c(30, NA, 30, NA), escShape = 8)
+  set.seed(5)
+  draws <- t(replicate(4000, {
+    m <- yearMultipliers(ras, NULL, fitted = TRUE)
+    c(ign1 = m$ignition[1], ign3 = m$ignition[3], ign2 = m$ignition[2], esc = m$escape[1])
+  }))
+  ## one draw shared by the cells of a process, none where there is no fitted effect
+  expect_identical(draws[, "ign1"], draws[, "ign3"])
+  expect_true(all(draws[, "ign2"] == 1))
+  ## Gamma(shape, shape) times the multiplier: mean multiplier, sd multiplier / sqrt(shape)
+  expect_equal(mean(draws[, "ign1"]), 1.6, tolerance = 0.01)
+  expect_equal(stats::sd(draws[, "ign1"]), 1.6 / sqrt(30), tolerance = 0.05)
+  expect_equal(mean(draws[, "esc"]), 1.4, tolerance = 0.02)
+  expect_equal(stats::sd(draws[, "esc"]), 1.4 / sqrt(8), tolerance = 0.05)
+  ## a shape of NA is no uncertainty
+  m <- yearMultipliers(fittedRas(igShape = NA, escShape = NA), NULL, fitted = TRUE)
+  expect_identical(m, list(ignition = rep(1.6, 4), escape = rep(1.4, 4)))
+})
+
+test_that("fitted without fitted effects for the year draws, with one message per run", {
+  st <- new.env()
+  none <- fittedRas(igEff = NA, escEff = NA)
+  expect_message(expect_true(fittedYearEffectsUsed(none, "fitted", st, 2001)), "no fitted year effect for 2001")
+  expect_no_message(fittedYearEffectsUsed(none, "fitted", st, 2002))
+  expect_no_message(expect_false(fittedYearEffectsUsed(none, "draw", new.env(), 2001)))
+  expect_no_message(fittedYearEffectsUsed(fittedRas(), "fitted", new.env(), 2001))
 })
