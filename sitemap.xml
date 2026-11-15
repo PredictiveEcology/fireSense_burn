@@ -19,6 +19,7 @@
 <url><loc>/reference/emptyBurnRaster.html</loc></url>
 <url><loc>/reference/escapePixelsOf.html</loc></url>
 <url><loc>/reference/fineCoarseTable.html</loc></url>
+<url><loc>/reference/fittedYearEffectsUsed.html</loc></url>
 <url><loc>/reference/ignitionsFromBurnSummary.html</loc></url>
 <url><loc>/reference/index.html</loc></url>
 <url><loc>/reference/linkedSpread.html</loc></url>
@@ -32,6 +33,7 @@
 <url><loc>/reference/replayedIgnitions.html</loc></url>
 <url><loc>/reference/saveReplayIgnitions.html</loc></url>
 <url><loc>/reference/smallFires.html</loc></url>
+<url><loc>/reference/yearMultipliers.html</loc></url>
 <url><loc>/reference/yearSDLayer.html</loc></url>
 <url><loc>/reference/yearSpreadEps.html</loc></url>
 <url><loc>/reference/yearSpreadProb.html</loc></url>

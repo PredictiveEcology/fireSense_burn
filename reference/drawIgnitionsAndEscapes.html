@@ -5,6 +5,7 @@ for coarse pixels with ignitions, draws escapes from $escape with mean escapePro
 With z, both means are first multiplied by the year effect (fireSenseUtils::yearEffectMultiplier() with
 the ignitionYearSD and escapeYearSD layers), each with its own z and its own sd: a year with a high
 ignition z does not have a high escape z, nor more spread (spread has its own z, yearSpreadProb()).
+With fitted, the year's fitted multipliers replace these where they exist (yearMultipliers()).
 Each ignition is placed in a random flammable flammableRTM pixel inside its coarse pixel, and
 which of a coarse pixel's ignitions escaped is drawn: exactly escapes of them."><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
 <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
@@ -24,7 +25,7 @@ which of a coarse pixel's ignitions escaped is drawn: exactly escapes of them.">
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">fireSense_burn</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9017</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9018</span>
       </span>
     </div>
 
@@ -66,12 +67,13 @@ for coarse pixels with ignitions, draws escapes from <code>$escape</code> with m
 With <code>z</code>, both means are first multiplied by the year effect (<code><a href="https://rdrr.io/pkg/fireSenseUtils/man/yearEffect.html" class="external-link">fireSenseUtils::yearEffectMultiplier()</a></code> with
 the <code>ignitionYearSD</code> and <code>escapeYearSD</code> layers), each with its own z and its own sd: a year with a high
 ignition z does not have a high escape z, nor more spread (spread has its own z, <code><a href="yearSpreadProb.html">yearSpreadProb()</a></code>).
+With <code>fitted</code>, the year's fitted multipliers replace these where they exist (<code><a href="yearMultipliers.html">yearMultipliers()</a></code>).
 Each ignition is placed in a random flammable <code>flammableRTM</code> pixel inside its coarse pixel, and
 which of a coarse pixel's ignitions escaped is drawn: exactly <code>escapes</code> of them.</p>
     </div>
 
     <div id="ref-usage">
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">drawIgnitionsAndEscapes</span><span class="op">(</span><span class="va">sim</span>, <span class="va">store</span>, z <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">drawIgnitionsAndEscapes</span><span class="op">(</span><span class="va">sim</span>, <span class="va">store</span>, z <span class="op">=</span> <span class="cn">NULL</span>, fitted <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div id="arguments">
@@ -88,6 +90,10 @@ which of a coarse pixel's ignitions escaped is drawn: exactly <code>escapes</cod
 
 <dt id="arg-z">z<a class="anchor" aria-label="anchor" href="#arg-z"></a></dt>
 <dd><p>The year's z (<code><a href="yearZ.html">yearZ()</a></code>: <code>c(ignition = , escape = )</code>), or <code>NULL</code>: no year effect.</p></dd>
+
+
+<dt id="arg-fitted">fitted<a class="anchor" aria-label="anchor" href="#arg-fitted"></a></dt>
+<dd><p><code>TRUE</code> (<code>yearEffects = "fitted"</code>): use the year's fitted multipliers where the surface has them.</p></dd>
 
 </dl></div>
     <div id="value">

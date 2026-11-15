@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="index.html">fireSense_burn</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9017</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9018</span>
       </span>
     </div>
 
@@ -485,7 +485,7 @@ NA
 NA
 </td>
 <td style="text-align:left;">
-Where each year’s fires start. <code>"predicted"</code>: ignitions and escapes are drawn from <code>fireSense_IgAndEscapeProbRas</code>. <code>"observedEscapes"</code> (for hindcasts that test spread alone): the year’s observed escapes in <code>firePolys</code> (the escape definition, year <code>floor(time(sim))</code>) are spread from the snapped centroids of their polygons, the starts of the spread fit (<code><a href="https://rdrr.io/pkg/fireSenseUtils/man/fireStarts.html" class="external-link">fireSenseUtils::escapeFireSet()</a></code>), and nothing is drawn from the predicted surfaces. Either way a fire starts only in the core of <code>rasterToMatchLargeELF</code>; it still spreads into the buffer.
+Where each year’s fires start. <code>"predicted"</code>: ignitions and escapes are drawn from <code>fireSense_IgAndEscapeProbRas</code>. <code>"observedEscapes"</code> (for hindcasts that test spread alone): the year’s observed escapes in <code>firePolys</code> (the escape definition, year <code>floor(time(sim))</code>) are spread from the snapped centroids of their polygons, the starts of the spread fit (<code><a href="https://rdrr.io/pkg/fireSenseUtils/man/fireStarts.html" class="external-link">fireSenseUtils::escapeFireSet()</a></code>), and nothing is drawn from the predicted surfaces. <code>"replay"</code> (a fast hindcast that varies spread alone): each rep spreads the ignitions and escapes of the same rep of the hindcast in <code>replayFrom</code> (<code><a href="reference/readReplayIgnitions.html">readReplayIgnitions()</a></code>), and nothing is drawn. Either way a fire starts only in the core of <code>rasterToMatchLargeELF</code>; it still spreads into the buffer.
 </td>
 <td style="text-align:left;">
 TRUE
@@ -528,6 +528,48 @@ NA
 </td>
 <td style="text-align:left;">
 Passed to <code><a href="https://spades-tools.predictiveecology.org/reference/spreadCpp.html" class="external-link">SpaDES.tools::spreadCpp()</a></code>: mean jump distance, in cells.
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+</tr><tr><td style="text-align:left;">
+replayFrom
+</td>
+<td style="text-align:left;">
+character
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+Only with <code>ignitionSource = "replay"</code>: the <code>outputPath</code> of the reference hindcast job (one ELF, year and set folder). Its <code>hindcast_ignitions.csv</code> (<code>replaySave</code>) gives each rep’s ignitions; a hindcast made before <code>replaySave</code> existed has none, and they are rebuilt from its <code>fireSense_burnSummary.csv</code> and <code>hindcast_reps.csv</code> (<code><a href="reference/ignitionsFromBurnSummary.html">ignitionsFromBurnSummary()</a></code>). The same parameter of <code>fireSense_dataPrepPredict</code>, so <code>.globals = list(replayFrom = )</code> sets both.
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+</tr><tr><td style="text-align:left;">
+replaySave
+</td>
+<td style="text-align:left;">
+logical
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+If <code>TRUE</code>, each burn event adds its rep’s ignitions (<code>rep</code>, <code>pixelID</code>, <code>escaped</code>, one row per ignition; one row with <code>pixelID</code> <code>NA</code> for a rep without any) to <code>hindcast_ignitions.csv</code> in <code>outputPath(sim)</code>, for a later <code>ignitionSource = "replay"</code>. The rep is <code>round((time(sim) - .runInitialTime) / .runInterval) + 1</code>, as fireSense_summary numbers it.
 </td>
 <td style="text-align:left;">
 TRUE
@@ -591,7 +633,7 @@ ignitionsAndEscapes
 data.table
 </td>
 <td style="text-align:left;">
-This year’s ignitions, one row per ignited pixel, in random order: <code>pixelID</code> (cell index of <code>flammableRTM</code>), <code>igProb</code>, <code>ignitions</code>, <code>escapeProb</code>, <code>escapes</code> of the coarse pixel it was drawn from, and <code>escaped</code>, whether this ignition escaped: exactly <code>escapes</code> of a coarse pixel’s rows are TRUE. Drawn each year from <code>fireSense_IgAndEscapeProbRas</code>; without that raster a supplied <code>ignitionsAndEscapes</code> is used as it is. With <code>ignitionSource = "observedEscapes"</code>: the year’s observed escapes, with only <code>pixelID</code> and <code>escaped</code> (all TRUE).
+This year’s ignitions, one row per ignited pixel, in random order: <code>pixelID</code> (cell index of <code>flammableRTM</code>), <code>igProb</code>, <code>ignitions</code>, <code>escapeProb</code>, <code>escapes</code> of the coarse pixel it was drawn from, and <code>escaped</code>, whether this ignition escaped: exactly <code>escapes</code> of a coarse pixel’s rows are TRUE. Drawn each year from <code>fireSense_IgAndEscapeProbRas</code>; without that raster a supplied <code>ignitionsAndEscapes</code> is used as it is. With <code>ignitionSource = "observedEscapes"</code>: the year’s observed escapes, with only <code>pixelID</code> and <code>escaped</code> (all TRUE); with <code>"replay"</code>: the rep’s ignitions of the <code>replayFrom</code> hindcast, with only <code>pixelID</code> and <code>escaped</code>.
 </td>
 </tr><tr><td style="text-align:left;">
 burnDT

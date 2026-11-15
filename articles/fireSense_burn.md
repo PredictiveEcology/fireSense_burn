@@ -99,7 +99,7 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
   <tr>
    <td style="text-align:left;"> fireSense_IgAndEscapeProbRas </td>
    <td style="text-align:left;"> SpatRaster </td>
-   <td style="text-align:left;"> Two layers at the resolution of `ignitionFitRTM`, from fireSense_ignitionPredict: `ignitionProb`, the expected ignitions per pixel and year, and `escapeProb`, the expected escapes per pixel and year given an ignition. Ignitions and escapes are drawn from these each year. Optional layers `ignitionYearSD` and `escapeYearSD`: the sd of the year effect of each; a year multiplies the means by exp(sd z - sd^2 / 2), with the year's z, which spread does not share. Absent or 0: no year effect. </td>
+   <td style="text-align:left;"> Two layers at the resolution of `ignitionFitRTM`, from fireSense_ignitionPredict: `ignitionProb`, the expected ignitions per pixel and year, and `escapeProb`, the expected escapes per pixel and year given an ignition. Ignitions and escapes are drawn from these each year. Optional layers `ignitionYearSD` and `escapeYearSD`: the sd of the year effect of each; a year multiplies the means by exp(sd z - sd^2 / 2), with the year's z, which spread does not share. Absent or 0: no year effect. Optional layers `ignitionYearEffect` and `escapeYearEffect`: the year's fitted multipliers, used instead with `yearEffects = "fitted"`, and `ignitionYearEffectShape` and `escapeYearEffectShape`, the shapes of their gamma posteriors, from which each rep-year draws its multiplier (`yearMultipliers()`). </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
@@ -291,6 +291,15 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn)
    <td style="text-align:left;"> NA </td>
    <td style="text-align:left;"> NA </td>
    <td style="text-align:left;"> If `TRUE`, each burn event adds its rep's ignitions (`rep`, `pixelID`, `escaped`, one row per ignition; one row with `pixelID` `NA` for a rep without any) to `hindcast_ignitions.csv` in `outputPath(sim)`, for a later `ignitionSource = "replay"`. The rep is `round((time(sim) - .runInitialTime) / .runInterval) + 1`, as fireSense_summary numbers it. </td>
+   <td style="text-align:left;"> TRUE </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> yearEffects </td>
+   <td style="text-align:left;"> character </td>
+   <td style="text-align:left;"> draw </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> How the expected ignitions and escapes of a year get their year effect. `"draw"`: each burn event draws z and multiplies by `fireSenseUtils::yearEffectMultiplier(sd, z)` (the `ignitionYearSD` and `escapeYearSD` layers), as a forecast or NRV run must. `"fitted"` (for hindcasts of fit years only): where `fireSense_IgAndEscapeProbRas` has the layers `ignitionYearEffect` and `escapeYearEffect` (the year's fitted multipliers, from fireSense_ignitionFit through fireSense_ignitionPredict), they are used instead; cells without one (`NA`, or no layer) keep the draw. z is drawn either way, so the random numbers that follow are the same. </td>
    <td style="text-align:left;"> TRUE </td>
   </tr>
   <tr>
