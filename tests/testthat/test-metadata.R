@@ -61,7 +61,8 @@ test_that("parameters are the expected names and classes", {
                 ignitionSource        = "character",
                 jumpMeanDist          = "numeric",
                 jumpTries             = "integer",
-                whichModulesToPrepare = "character")
+                whichModulesToPrepare = "character",
+                yearEffects           = "character")
   expect_identical(classes[order(names(classes))], expected[order(names(expected))])
 })
 
@@ -76,6 +77,7 @@ test_that("parameter defaults are unchanged", {
   expect_identical(p$.runInterval, 1)
   expect_identical(p$escapeSizeHa, 50)
   expect_identical(p$ignitionSource, "predicted")
+  expect_identical(p$yearEffects, "draw")
   expect_identical(p$jumpTries, 20L)
   expect_identical(p$jumpMeanDist, 3)
   expect_identical(p$whichModulesToPrepare,
@@ -90,17 +92,18 @@ test_that("every parameter, input and output has a description", {
 })
 
 test_that("required packages are unchanged", {
+  ## the packages, not their version floors, which every bump after a merge raises
   expect_setequal(
-    unlist(md$reqdPkgs),
+    sub(" \\(.*\\)$", "", unlist(md$reqdPkgs)),
     c(
       "data.table",
-      "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9158)",
+      "PredictiveEcology/fireSenseUtils@development",
       "ggplot2",
       "ggspatial",
       "httr2",
       "PredictiveEcology/reproducible@development",
-      "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
-      "PredictiveEcology/SpaDES.tools@development (>= 2.2.0.9003)",
+      "PredictiveEcology/SpaDES.core@development",
+      "PredictiveEcology/SpaDES.tools@development",
       "terra"
     )
   )

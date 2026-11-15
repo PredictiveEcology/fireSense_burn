@@ -18,7 +18,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_burn.Rmd"), ## same file
   reqdPkgs = list("data.table", "httr2", "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
-                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9165)", # 9162: linearLinkProb(), smooth links (#229); 9138: powerLawShape
+                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9167)", # 9167: escapeProbPerIgnition(); 9162: linearLinkProb(), smooth links (#229); 9138: powerLawShape
                   "ggplot2", "ggspatial", "PredictiveEcology/reproducible@development",
                   "PredictiveEcology/SpaDES.tools@development (>= 2.2.0.9004)", "terra"),
   loadOrder = list(after = c("fireSense_ignitionPredict", "fireSense_spreadPredict")),
@@ -59,6 +59,15 @@ defineModule(sim, list(
                           "with; 0 is off.")),
     defineParameter("jumpMeanDist", "numeric", 3, 0, NA,
                     "Passed to `SpaDES.tools::spreadCpp()`: mean jump distance, in cells."),
+    defineParameter("yearEffects", "character", "draw", NA, NA,
+                    paste("How the expected ignitions and escapes of a year get their year effect. `\"draw\"`: each burn",
+                          "event draws z and multiplies by `fireSenseUtils::yearEffectMultiplier(sd, z)` (the",
+                          "`ignitionYearSD` and `escapeYearSD` layers), as a forecast or NRV run must. `\"fitted\"` (for",
+                          "hindcasts of fit years only): where `fireSense_IgAndEscapeProbRas` has the layers",
+                          "`ignitionYearEffect` and `escapeYearEffect` (the year's fitted multipliers, from",
+                          "fireSense_ignitionFit through fireSense_ignitionPredict), they are used instead; cells without",
+                          "one (`NA`, or no layer) keep the draw. z is drawn either way, so the random numbers that follow",
+                          "are the same.")),
     defineParameter("whichModulesToPrepare", "character",
                     default = c("fireSense_spreadPredict", "fireSense_ignitionPredict"),
                     NA, NA,
@@ -99,7 +108,8 @@ defineModule(sim, list(
                        "escapes per pixel and year given an ignition. Ignitions and escapes are drawn from these each year.",
                        "Optional layers `ignitionYearSD` and `escapeYearSD`: the sd of the year effect of each; a year",
                        "multiplies the means by exp(sd * z - sd^2 / 2), with the year's z, which spread does not share.",
-                       "Absent or 0: no year effect.")),
+                       "Absent or 0: no year effect. Optional layers `ignitionYearEffect` and `escapeYearEffect`: the",
+                       "year's fitted multipliers, used instead with `yearEffects = \"fitted\"`.")),
     expectsInput("fireSense_IgAndEscapeDistribution", "list",
                  paste("`list(ignition = , escape = )`, from fireSense_ignitionPredict: the objective the ignition and",
                        "escape models were fitted with. Only `\"count:poisson\"` can be drawn from.")),
@@ -178,6 +188,8 @@ doEvent.fireSense_burn = function(sim, eventTime, eventType, debug = FALSE) {
 
       if (!is.null(sim$fireSense_SpreadPredicted))
         stopifnot(length(na.omit(sim$fireSense_SpreadPredicted[])) > 0)
+      if (!P(sim)$yearEffects %in% c("draw", "fitted"))
+        stop("fireSense_burn: yearEffects must be \"draw\" or \"fitted\"")
       if (!P(sim)$ignitionSource %in% c("predicted", "observedEscapes"))
         stop("fireSense_burn: ignitionSource must be \"predicted\" or \"observedEscapes\"")
       if (identical(P(sim)$ignitionSource, "observedEscapes") &&
@@ -262,7 +274,8 @@ burn <- function(sim) {
   } else {
     z <- yearZ(sim$fireSense_IgAndEscapeProbRas)
     if (!is.null(sim$fireSense_IgAndEscapeProbRas))
-      sim$ignitionsAndEscapes <- drawIgnitionsAndEscapes(sim, store = mod, z = z)
+      sim$ignitionsAndEscapes <- drawIgnitionsAndEscapes(sim, store = mod, z = z,
+                                                         fitted = identical(Par$yearEffects, "fitted"))
   }
 
   ## A fire starts only in the core (the buffer removes edge effects, it has no fires of its own): the ignition
@@ -366,7 +379,8 @@ checkDrawable <- function(objective, what) {
 #'
 #' The escape model is fitted on ignited pixel-years only, so its mean `escapeMean` is the expected escapes of a
 #' pixel that has at least one ignition. Each ignition escapes with probability
-#' `q = escapeMean * (1 - exp(-ignitionMean)) / ignitionMean`, capped at 1, and a pixel's escapes are binomial over
+#' `q = escapeMean * (1 - exp(-ignitionMean)) / ignitionMean`, capped at 1 (`fireSenseUtils::escapeProbPerIgnition()`,
+#' which fireSense_ignitionFit's fitted year effects use too), and a pixel's escapes are binomial over
 #' its `ignitions`. For Poisson ignitions `(1 - exp(-ignitionMean)) / ignitionMean` is `1 / E[ignitions | ignitions > 0]`,
 #' so the expected escapes of an ignited pixel are `escapeMean` (more ignitions, more escapes) and never exceed the
 #' ignitions. Drawing `rpois(escapeMean)` and truncating it at the ignitions would lower the mean.
@@ -380,8 +394,7 @@ checkDrawable <- function(objective, what) {
 #' @return An integer vector of escapes, one per `ignitions`.
 drawEscapes <- function(objective, escapeMean, ignitionMean, ignitions, what) {
   checkDrawable(objective, what)
-  escapeMean[is.na(escapeMean)] <- 0
-  q <- pmin(1, escapeMean * (-expm1(-ignitionMean)) / ignitionMean)
+  q <- fireSenseUtils::escapeProbPerIgnition(escapeMean, ignitionMean)
   stats::rbinom(length(ignitions), size = ignitions, prob = q)
 }
 
@@ -393,16 +406,18 @@ drawEscapes <- function(objective, escapeMean, ignitionMean, ignitions, what) {
 #' With `z`, both means are first multiplied by the year effect (`fireSenseUtils::yearEffectMultiplier()` with
 #' the `ignitionYearSD` and `escapeYearSD` layers), each with its own z and its own sd: a year with a high
 #' ignition z does not have a high escape z, nor more spread (spread has its own z, `yearSpreadProb()`).
+#' With `fitted`, the year's fitted multipliers replace these where they exist (`yearMultipliers()`).
 #' Each ignition is placed in a random flammable `flammableRTM` pixel inside its coarse pixel, and
 #' which of a coarse pixel's ignitions escaped is drawn: exactly `escapes` of them.
 #'
 #' @param sim A `simList`.
 #' @param store An environment to keep the coarse-to-fine mapping in (the module's `mod`).
 #' @param z The year's z (`yearZ()`: `c(ignition = , escape = )`), or `NULL`: no year effect.
+#' @param fitted `TRUE` (`yearEffects = "fitted"`): use the year's fitted multipliers where the surface has them.
 #'
 #' @return A `data.table`, one row per ignition, in random order: `pixelID`, `igProb`, `ignitions`,
 #'   `escapeProb`, `escapes`, `escaped`. `igProb` and `escapeProb` are the means drawn from, after the year effect.
-drawIgnitionsAndEscapes <- function(sim, store, z = NULL) {
+drawIgnitionsAndEscapes <- function(sim, store, z = NULL, fitted = FALSE) {
   dist <- sim$fireSense_IgAndEscapeDistribution
   if (is.null(dist$ignition) || is.null(dist$escape))
     stop("fireSense_burn: fireSense_IgAndEscapeProbRas needs fireSense_IgAndEscapeDistribution ",
@@ -411,12 +426,10 @@ drawIgnitionsAndEscapes <- function(sim, store, z = NULL) {
   coarse <- data.table(pixelID = seq_len(terra::ncell(sim$fireSense_IgAndEscapeProbRas)),
                        igProb = terra::values(sim$fireSense_IgAndEscapeProbRas[["ignitionProb"]], mat = FALSE),
                        escapeProb = terra::values(sim$fireSense_IgAndEscapeProbRas[["escapeProb"]], mat = FALSE))
-  if (!is.null(z)) {
+  if (!is.null(z) || fitted) {
     ## the year's multiplier has mean 1 over z, so the long-run means are kept and stay valid Poisson means
-    ras <- sim$fireSense_IgAndEscapeProbRas
-    set(coarse, NULL, c("igProb", "escapeProb"),
-        list(coarse$igProb * fireSenseUtils::yearEffectMultiplier(yearSDLayer(ras, "ignitionYearSD"), z[["ignition"]]),
-             coarse$escapeProb * fireSenseUtils::yearEffectMultiplier(yearSDLayer(ras, "escapeYearSD"), z[["escape"]])))
+    m <- yearMultipliers(sim$fireSense_IgAndEscapeProbRas, z, fitted)
+    set(coarse, NULL, c("igProb", "escapeProb"), list(coarse$igProb * m$ignition, coarse$escapeProb * m$escape))
   }
   coarse <- coarse[!is.na(coarse$igProb), ]
   igns <- drawCounts(dist$ignition, coarse$igProb, "ignition")
@@ -527,6 +540,31 @@ yearZ <- function(probRas) {
   sds <- intersect(c("ignitionYearSD", "escapeYearSD"), names(probRas))
   if (length(sds) && any(terra::values(probRas[[sds]], mat = FALSE) > 0, na.rm = TRUE))
     c(ignition = stats::rnorm(1), escape = stats::rnorm(1))
+}
+
+#' The year's multipliers of the expected ignitions and of the expected escapes, per cell
+#'
+#' `fireSenseUtils::yearEffectMultiplier()` of each sd layer (`yearSDLayer()`) and the year's z (1 without z). With
+#' `fitted`, a cell's fitted multiplier (layers `ignitionYearEffect` and `escapeYearEffect`, from
+#' fireSense_ignitionPredict) replaces it where it is not `NA`: a hindcast of a fit year then expects that year's
+#' fitted target counts (fireSense_ignitionFit's `fittedYearEffects()`).
+#'
+#' @param probRas `fireSense_IgAndEscapeProbRas`.
+#' @param z The year's z (`yearZ()`), or `NULL`.
+#' @param fitted Use the fitted multipliers where there are.
+#' @return A list of two numeric vectors, one value per cell: `ignition` and `escape`.
+yearMultipliers <- function(probRas, z, fitted = FALSE) {
+  one <- function(process) {
+    m <- if (is.null(z)) rep(1, terra::ncell(probRas)) else
+      fireSenseUtils::yearEffectMultiplier(yearSDLayer(probRas, paste0(process, "YearSD")), z[[process]])
+    layer <- paste0(process, "YearEffect")
+    if (fitted && layer %in% names(probRas)) {
+      f <- terra::values(probRas[[layer]], mat = FALSE)
+      m[!is.na(f)] <- f[!is.na(f)]
+    }
+    m
+  }
+  list(ignition = one("ignition"), escape = one("escape"))
 }
 
 #' One year-effect sd layer of `fireSense_IgAndEscapeProbRas`, as a vector; 0 where it is absent
