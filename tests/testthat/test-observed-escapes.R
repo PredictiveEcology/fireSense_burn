@@ -28,17 +28,6 @@ obsStarts <- function(polys = obsPolys()) {
   data.table::data.table(YEAR = as.integer(st$YEAR), pixelID = as.integer(st$pixelID))
 }
 
-## surfaces that would ignite and escape fires in every coarse pixel, had they been drawn from
-predictedSurfaces <- function() {
-  coarse <- terra::rast(nrows = 2, ncols = 2, xmin = 0, xmax = 2500, ymin = 0, ymax = 2500,
-                        crs = "EPSG:3005", vals = 1)
-  ras <- c(coarse * 5, coarse * 5)
-  names(ras) <- c("ignitionProb", "escapeProb")
-  list(fireSense_IgAndEscapeProbRas = ras,
-       fireSense_IgAndEscapeDistribution = list(ignition = "count:poisson", escape = "count:poisson"),
-       ignitionFitRTM = coarse)
-}
-
 ## run with drawIgnitionsAndEscapes() replaced, to count its calls; burn() looks it up in the module's environment
 runCountingDraws <- function(params, times = list(start = 1, end = 1), ignitions = NULL) {
   sim <- runFireSense(ignitions, times = times, params = params, doSpades = FALSE,

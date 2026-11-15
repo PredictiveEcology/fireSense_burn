@@ -52,6 +52,8 @@ defineModule(sim, list(
                           "the year's observed escapes in `firePolys` (the escape definition, year `floor(time(sim))`) are spread",
                           "from the snapped centroids of their polygons, the starts of the spread fit",
                           "(`fireSenseUtils::escapeFireSet()`), and nothing is drawn from the predicted surfaces.",
+                          "`\"replay\"` (a fast hindcast that varies spread alone): each rep spreads the ignitions and escapes",
+                          "of the same rep of the hindcast in `replayFrom` (`readReplayIgnitions()`), and nothing is drawn.",
                           "Either way a fire starts only in the core of `rasterToMatchLargeELF`; it still spreads into the buffer.")),
     defineParameter("jumpTries", "integer", 20L, 0L, NA,
                     paste("Passed to `SpaDES.tools::spreadCpp()` for escaped fires: attempts to jump for a fire",
@@ -59,6 +61,17 @@ defineModule(sim, list(
                           "with; 0 is off.")),
     defineParameter("jumpMeanDist", "numeric", 3, 0, NA,
                     "Passed to `SpaDES.tools::spreadCpp()`: mean jump distance, in cells."),
+    defineParameter("replayFrom", "character", NA_character_, NA, NA,
+                    paste("Only with `ignitionSource = \"replay\"`: the `outputPath` of the reference hindcast job (one ELF,",
+                          "year and set folder). Its `hindcast_ignitions.csv` (`replaySave`) gives each rep's ignitions; a",
+                          "hindcast made before `replaySave` existed has none, and they are rebuilt from its",
+                          "`fireSense_burnSummary.csv` and `hindcast_reps.csv` (`ignitionsFromBurnSummary()`). The same",
+                          "parameter of `fireSense_dataPrepPredict`, so `.globals = list(replayFrom = )` sets both.")),
+    defineParameter("replaySave", "logical", FALSE, NA, NA,
+                    paste("If `TRUE`, each burn event adds its rep's ignitions (`rep`, `pixelID`, `escaped`, one row per",
+                          "ignition; one row with `pixelID` `NA` for a rep without any) to `hindcast_ignitions.csv` in",
+                          "`outputPath(sim)`, for a later `ignitionSource = \"replay\"`. The rep is",
+                          "`round((time(sim) - .runInitialTime) / .runInterval) + 1`, as fireSense_summary numbers it.")),
     defineParameter("whichModulesToPrepare", "character",
                     default = c("fireSense_spreadPredict", "fireSense_ignitionPredict"),
                     NA, NA,
@@ -142,7 +155,8 @@ defineModule(sim, list(
                         "from, and `escaped`, whether this ignition escaped: exactly `escapes` of a coarse pixel's rows",
                         "are TRUE. Drawn each year from `fireSense_IgAndEscapeProbRas`; without that raster a supplied",
                         "`ignitionsAndEscapes` is used as it is. With `ignitionSource = \"observedEscapes\"`: the",
-                        "year's observed escapes, with only `pixelID` and `escaped` (all TRUE).")),
+                        "year's observed escapes, with only `pixelID` and `escaped` (all TRUE); with `\"replay\"`: the",
+                        "rep's ignitions of the `replayFrom` hindcast, with only `pixelID` and `escaped`.")),
     createsOutput("burnDT", "data.table",
                   paste("The most recent fire year's burned pixels: `initialPixels` (the fire's ignition pixel),",
                         "`pixels`, and `fire_id`.")),
@@ -178,11 +192,15 @@ doEvent.fireSense_burn = function(sim, eventTime, eventType, debug = FALSE) {
 
       if (!is.null(sim$fireSense_SpreadPredicted))
         stopifnot(length(na.omit(sim$fireSense_SpreadPredicted[])) > 0)
-      if (!P(sim)$ignitionSource %in% c("predicted", "observedEscapes"))
-        stop("fireSense_burn: ignitionSource must be \"predicted\" or \"observedEscapes\"")
+      if (!P(sim)$ignitionSource %in% c("predicted", "observedEscapes", "replay"))
+        stop("fireSense_burn: ignitionSource must be \"predicted\", \"observedEscapes\" or \"replay\"")
       if (identical(P(sim)$ignitionSource, "observedEscapes") &&
           is.null(sim$firePolys))
         stop("fireSense_burn: ignitionSource = \"observedEscapes\" needs `firePolys`")
+      if (identical(P(sim)$ignitionSource, "replay") &&
+          (is.na(P(sim)$replayFrom) || !dir.exists(P(sim)$replayFrom)))
+        stop("fireSense_burn: ignitionSource = \"replay\" needs `replayFrom`, the folder of a hindcast job; got ",
+             P(sim)$replayFrom)
       fireSenseUtils::escapeDefinitionOf(sim)
 
       ## trying to avoid the raster warning no non-missing arguments to max
@@ -251,7 +269,8 @@ burn <- function(sim) {
   ## ignition fell, so a shared z multiplied the two: escapes were inflated by exp(ignitionYearSD * escapeYearSD),
   ## and sharing spread's z burned about twice the area.
   ## With ignitionSource = "observedEscapes" the year's observed escapes are spread instead and nothing is drawn,
-  ## so a hindcast tests spread alone.
+  ## so a hindcast tests spread alone. With "replay" the rep's ignitions and escapes of a reference hindcast are
+  ## spread, so hindcasts that differ in spread alone share them rep by rep.
   definition <- fireSenseUtils::escapeDefinitionOf(sim)
   fireSenseUtils::checkEscapeDefinition(sim$fireSense_EscapeDefinition, definition, "fireSense_spreadPredict's fit")
   if (identical(Par$ignitionSource, "observedEscapes")) {
@@ -259,11 +278,20 @@ burn <- function(sim) {
     if (is.null(mod$observedStarts))
       mod$observedStarts <- observedEscapeStarts(sim$firePolys, sim$flammableRTM, definition)
     sim$ignitionsAndEscapes <- observedEscapes(mod$observedStarts, floor(time(sim) + 1e-9))
+  } else if (identical(Par$ignitionSource, "replay")) {
+    ## every rep of the reference, read once and kept in `mod`
+    if (is.null(mod$replayIgnitions))
+      mod$replayIgnitions <- readReplayIgnitions(Par$replayFrom,
+                                                 escapePixelsOf(Par$escapeSizeHa, sim$fireSense_SpreadPredicted))
+    sim$ignitionsAndEscapes <- replayedIgnitions(mod$replayIgnitions, replayRep(time(sim), Par))
   } else {
     z <- yearZ(sim$fireSense_IgAndEscapeProbRas)
     if (!is.null(sim$fireSense_IgAndEscapeProbRas))
       sim$ignitionsAndEscapes <- drawIgnitionsAndEscapes(sim, store = mod, z = z)
   }
+  if (isTRUE(Par$replaySave))
+    mod$savedIgnitions <- saveReplayIgnitions(mod$savedIgnitions, sim$ignitionsAndEscapes, replayRep(time(sim), Par),
+                                              outputPath(sim))
 
   ## A fire starts only in the core (the buffer removes edge effects, it has no fires of its own): the ignition
   ## surfaces stay complete, only the starts are dropped. The fire spreads into the buffer from a core start.
@@ -293,8 +321,7 @@ burn <- function(sim) {
   ## first escapeSizeHa whatever the spread probability, then spreads. Several fires starting on one
   ## pixel are one fire: the first start burns the pixel and the others cannot.
   escLocs <- unique(ig$pixelID[ig$escaped %in% TRUE])
-  minPx <- if (length(Par$escapeSizeHa) && !is.na(Par$escapeSizeHa))
-    fireSenseUtils::escapeSizePixels(Par$escapeSizeHa, sim$fireSense_SpreadPredicted) else 0L
+  minPx <- escapePixelsOf(Par$escapeSizeHa, sim$fireSense_SpreadPredicted)
   spreadState <- data.table(initialPixels = integer(), pixels = integer())
   if (length(escLocs)) {
     args <- list(landscape = sim$fireSense_SpreadPredicted, loci = escLocs, directions = 8L, minSize = minPx,
@@ -473,6 +500,117 @@ observedEscapeStarts <- function(firePolys, flammableRTM, definition) {
 observedEscapes <- function(starts, year) {
   cells <- starts$pixelID[starts$YEAR == year & !is.na(starts$pixelID)]
   data.table(pixelID = cells, escaped = rep(TRUE, length(cells)))
+}
+
+#' Pixels an escaped fire burns first: `fireSenseUtils::escapeSizePixels()`, 0 without an escape size
+#'
+#' @param escapeSizeHa The `escapeSizeHa` parameter; `NA` or empty is no escape definition.
+#' @param landscape The spread grid (`fireSense_SpreadPredicted`).
+#' @return An integer.
+escapePixelsOf <- function(escapeSizeHa, landscape) {
+  if (length(escapeSizeHa) && !is.na(escapeSizeHa)) fireSenseUtils::escapeSizePixels(escapeSizeHa, landscape) else 0L
+}
+
+#' The file of a hindcast's ignitions per rep, for `ignitionSource = "replay"`
+replayIgnitionsFile <- "hindcast_ignitions.csv"
+
+#' The rep of a burn event in a hindcast
+#'
+#' A hindcast job for year Y runs its reps at times Y, Y + `.runInterval`, ...; rep
+#' `round((time - .runInitialTime) / .runInterval) + 1`, as fireSense_summary numbers them (`hindcastInterval` is
+#' `.runInterval` there, `fireSenseUtils::hindcastSetup()`). `.runInterval` `NA` (one burn) is rep 1.
+#'
+#' @param time `time(sim)`.
+#' @param params The module's parameters (`Par`): `.runInitialTime` and `.runInterval`.
+#' @return An integer.
+replayRep <- function(time, params) {
+  if (is.na(params$.runInterval)) return(1L)
+  as.integer(round((time - params$.runInitialTime) / params$.runInterval)) + 1L
+}
+
+#' Add this rep's ignitions to the replay file
+#'
+#' Rewrites `hindcast_ignitions.csv` in `path` with every rep so far: `rep`, `pixelID`, `escaped`, one row per
+#' ignition, and one row with `pixelID` `NA` for a rep without ignitions, so the file says which reps it has.
+#'
+#' @param saved The rows of the earlier reps (`NULL` at the first).
+#' @param ignitions This rep's `ignitionsAndEscapes` (`NULL`: none).
+#' @param repNo This rep (`replayRep()`).
+#' @param path `outputPath(sim)`.
+#' @return `saved` with this rep's rows, which are also written.
+saveReplayIgnitions <- function(saved, ignitions, repNo, path) {
+  one <- if (NROW(ignitions)) data.table(rep = repNo, pixelID = as.integer(ignitions$pixelID),
+                                         escaped = ignitions$escaped %in% TRUE) else
+    data.table(rep = repNo, pixelID = NA_integer_, escaped = NA)
+  saved <- rbind(if (!is.null(saved)) saved[saved$rep != repNo, ], one)
+  dir.create(path, recursive = TRUE, showWarnings = FALSE)
+  fwrite(saved, file.path(path, replayIgnitionsFile))
+  saved
+}
+
+#' Every rep's ignitions of a reference hindcast
+#'
+#' Reads `hindcast_ignitions.csv` in `path` (`replaySave`). A hindcast made before that file existed has
+#' none: its ignitions are rebuilt from `fireSense_burnSummary.csv` (`ignitionsFromBurnSummary()`).
+#'
+#' @param path The reference hindcast job's `outputPath`.
+#' @param escapePixels `fireSenseUtils::escapeSizePixels()` of `escapeSizeHa` (0 without): a rebuilt fire of at
+#'   least this many pixels escaped.
+#' @return A `data.table` with `rep`, `pixelID` and `escaped`, as `saveReplayIgnitions()` writes it.
+readReplayIgnitions <- function(path, escapePixels) {
+  f <- file.path(path, replayIgnitionsFile)
+  if (file.exists(f))
+    return(fread(f, colClasses = c(rep = "integer", pixelID = "integer", escaped = "logical")))
+  files <- file.path(path, c("fireSense_burnSummary.csv", "hindcast_reps.csv"))
+  if (!all(file.exists(files)))
+    stop("fireSense_burn: replayFrom (", path, ") has neither ", replayIgnitionsFile, " nor ",
+         paste(basename(files), collapse = " and "), " to rebuild it from", call. = FALSE)
+  ignitionsFromBurnSummary(fread(files[1]), fread(files[2]), escapePixels)
+}
+
+#' A hindcast's ignitions per rep, rebuilt from its fires
+#'
+#' For a hindcast made before `replaySave`. Each fire of `burnSummary` (`igLoc`, `N`, `year`: the burn event's
+#' time) is an ignition of the rep whose `time` in `reps` it has, and it escaped if it burned at least
+#' `escapePixels` pixels. Only the fires that started in the core and burned a pixel are there, so ignitions
+#' that burned nothing are missing (they burn nothing in the replay either), and two escapes on one pixel are one.
+#' An escape that burned fewer pixels (spread blocked) or a small fire of exactly `escapePixels` is misread. The
+#' escapes of each rep are compared with `reps$escapes` (fireSense_summary's count), with a warning naming the
+#' reps that differ.
+#'
+#' @param burnSummary The reference's `fireSense_burnSummary.csv`.
+#' @param reps The reference's `hindcast_reps.csv`: `rep`, `time`, `escapes`.
+#' @param escapePixels As in `readReplayIgnitions()`.
+#' @return As `readReplayIgnitions()`.
+ignitionsFromBurnSummary <- function(burnSummary, reps, escapePixels) {
+  repOf <- reps$rep[match(round(burnSummary$year, 6), round(reps$time, 6))]
+  if (anyNA(repOf))
+    stop("fireSense_burn: ", sum(is.na(repOf)), " fires of fireSense_burnSummary.csv have a time (`year`) that no rep ",
+         "of hindcast_reps.csv has", call. = FALSE)
+  ign <- data.table(rep = repOf, pixelID = as.integer(burnSummary$igLoc), escaped = burnSummary$N >= escapePixels)
+  rebuilt <- vapply(reps$rep, function(r) sum(ign$escaped[ign$rep == r]), integer(1))
+  differ <- rebuilt != reps$escapes
+  if (any(differ))
+    warning("fireSense_burn: the escapes rebuilt from fireSense_burnSummary.csv differ from hindcast_reps.csv in ",
+            sum(differ), " of ", length(differ), " reps (rep: rebuilt/recorded ",
+            paste0(reps$rep[differ], ": ", rebuilt[differ], "/", reps$escapes[differ], collapse = ", "), ")",
+            call. = FALSE)
+  ## a rep without fires has one row with pixelID NA, as saveReplayIgnitions() writes it
+  none <- setdiff(reps$rep, ign$rep)
+  rbind(ign, data.table(rep = none, pixelID = rep(NA_integer_, length(none)), escaped = rep(NA, length(none))))
+}
+
+#' One rep's ignitions of a reference hindcast
+#'
+#' @param replay `readReplayIgnitions()`.
+#' @param repNo The rep (`replayRep()`).
+#' @return A `data.table` with `pixelID` and `escaped`, one row per ignition, as `observedEscapes()` gives them.
+replayedIgnitions <- function(replay, repNo) {
+  if (!repNo %in% replay$rep)
+    stop("fireSense_burn: the replayed hindcast has no rep ", repNo, " (it has ", paste(range(replay$rep), collapse = "-"),
+         ")", call. = FALSE)
+  one <- replay[replay$rep == repNo & !is.na(replay$pixelID), ]
+  data.table(pixelID = one$pixelID, escaped = one$escaped)
 }
 
 #' A raster's values, or one number, as a vector of `n`; `NA` is 0 and `NULL` is all 0

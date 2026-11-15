@@ -73,6 +73,18 @@ runFireSense <- function(ignitions, times = list(start = 1, end = 1), params = l
 
 vals <- function(r) as.vector(terra::values(r))
 
+## surfaces that ignite and escape fires in every coarse pixel (2 x 2 pixels over the toy landscape), with
+## `ignitionProb` and `escapeProb` of `ign` and `esc`
+predictedSurfaces <- function(ign = 5, esc = 5) {
+  coarse <- terra::rast(nrows = 2, ncols = 2, xmin = 0, xmax = 2500, ymin = 0, ymax = 2500,
+                        crs = "EPSG:3005", vals = 1)
+  ras <- c(coarse * ign, coarse * esc)
+  names(ras) <- c("ignitionProb", "escapeProb")
+  list(fireSense_IgAndEscapeProbRas = ras,
+       fireSense_IgAndEscapeDistribution = list(ignition = "count:poisson", escape = "count:poisson"),
+       ignitionFitRTM = coarse)
+}
+
 ## `postProcess()` is called by the module (coarseToFineMap()); in a project `reproducible` is attached
 ## from the module's reqdPkgs.
 suppressPackageStartupMessages(library(reproducible))
