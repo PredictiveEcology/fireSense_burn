@@ -61,6 +61,8 @@ test_that("parameters are the expected names and classes", {
                 ignitionSource        = "character",
                 jumpMeanDist          = "numeric",
                 jumpTries             = "integer",
+                replayFrom            = "character",
+                replaySave            = "logical",
                 whichModulesToPrepare = "character",
                 yearEffects           = "character")
   expect_identical(classes[order(names(classes))], expected[order(names(expected))])
@@ -77,6 +79,8 @@ test_that("parameter defaults are unchanged", {
   expect_identical(p$.runInterval, 1)
   expect_identical(p$escapeSizeHa, 50)
   expect_identical(p$ignitionSource, "predicted")
+  expect_identical(p$replayFrom, NA_character_)
+  expect_identical(p$replaySave, FALSE)
   expect_identical(p$yearEffects, "draw")
   expect_identical(p$jumpTries, 20L)
   expect_identical(p$jumpMeanDist, 3)
