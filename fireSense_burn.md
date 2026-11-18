@@ -1,7 +1,7 @@
 ---
 title: "fireSense_burn Manual"
 subtitle: "v.0.0.0.9000"
-date: "Last updated: 2026-11-15"
+date: "Last updated: 2026-11-18"
 output:
   bookdown::html_document2:
     toc: true
@@ -177,10 +177,10 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn)
   <tr>
    <td style="text-align:left;"> .plots </td>
    <td style="text-align:left;"> characte.... </td>
-   <td style="text-align:left;">  </td>
+   <td style="text-align:left;"> screen </td>
    <td style="text-align:left;"> NA </td>
    <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> Passed to `types` in `Plots()`, e.g. "screen", "png". `NULL` or `NA` for no plots. </td>
+   <td style="text-align:left;"> Passed to `types` in `Plots()`, e.g. "screen" (default), "png". `NULL` or `NA` for no plots. </td>
    <td style="text-align:left;"> TRUE </td>
   </tr>
   <tr>
