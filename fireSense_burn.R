@@ -23,8 +23,8 @@ defineModule(sim, list(
                   "PredictiveEcology/SpaDES.tools@development (>= 2.2.0.9004)", "terra"),
   loadOrder = list(after = c("fireSense_ignitionPredict", "fireSense_spreadPredict")),
   parameters = rbind(
-    defineParameter(".plots", "character|logical", default = NULL, ## TODO: use .plotInitialTime etc.
-                    desc = "Passed to `types` in `Plots()`, e.g. \"screen\", \"png\". `NULL` or `NA` for no plots."),
+    defineParameter(".plots", "character|logical", default = "screen", ## TODO: use .plotInitialTime etc.
+                    desc = "Passed to `types` in `Plots()`, e.g. \"screen\" (default), \"png\". `NULL` or `NA` for no plots."),
     defineParameter(".plotInterval", "numeric", 10, NA, NA,
                     "Years between plots of annual fire IDs, cumulative burns and spread probability."),
     defineParameter(".runInitialTime", "numeric", start(sim), NA, NA,

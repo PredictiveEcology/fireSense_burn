@@ -73,7 +73,7 @@ test_that("parameter defaults are unchanged", {
   sim <- runFireSense(data.table::data.table(pixelID = 1L, escapes = 0L, escaped = FALSE),
                       times = list(start = 7, end = 7), doSpades = FALSE)
   p <- SpaDES.core::params(sim)$fireSense_burn
-  expect_null(p$.plots)
+  expect_identical(p$.plots, "screen")
   expect_identical(p$.plotInterval, 10)
   expect_identical(as.numeric(p$.runInitialTime), 7)
   expect_identical(p$.runInterval, 1)
