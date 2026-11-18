@@ -18,7 +18,7 @@ test_that(".plots = 'png' writes one figure per plotting year and registers it",
   expect_identical(sim$burnSummary$N, rep(40L, 4))
 })
 
-test_that("the default .plots = NULL writes no figure", {
+test_that("the default .plots = \"screen\" writes no figure file", {
   unlink(figDir(), recursive = TRUE)
   sim <- runFireSense(ig, times = list(start = 1, end = 2), params = list(.plotInterval = 1))
   expect_identical(length(list.files(figDir())), 0L)
