@@ -314,8 +314,9 @@ burn <- function(sim) {
   ig <- sim$ignitionsAndEscapes
   if (!is.null(sim$rasterToMatchLargeELF) && NROW(ig))
     ig <- ig[fireSenseUtils::inELFCore(ig$pixelID, sim$rasterToMatchLargeELF), ]
+  ## the year's maps are drawn on every way out, burned or not: the cumulative burn map is in them too
   if (NROW(ig) == 0L || !"fireSense_spreadPredict" %in% P(sim)$whichModulesToPrepare)
-    return(invisible(sim))
+    return(invisible(plotBurnMaps(sim)))
   if (!"escaped" %in% names(ig))
     stop("ignitionsAndEscapes needs the column `escaped`, which ignitions escaped ",
          "(fireSense_ignitionPredict >= 1.0.0.9003). Its `escapes` is a coarse pixel's count, repeated ",
@@ -354,20 +355,13 @@ burn <- function(sim) {
   spreadState <- rbind(spreadState, smallFires(
     loci = ig$pixelID[!ig$escaped %in% TRUE], sizesHa = sim$nonEscapedFireSizesHa,
     landscape = sim$fireSense_SpreadPredicted, spreadProb = spreadProbYear, burned = spreadState$pixels))
-  if (NROW(spreadState) == 0L) return(invisible(sim))
+  if (NROW(spreadState) == 0L) return(invisible(plotBurnMaps(sim)))
 
   spreadState[ , fire_id := .GRP, by = "initialPixels"] # Add an fire_id column
   sim$rstAnnualBurnID[spreadState$pixels] <- spreadState$fire_id
   sim$rstCurrentBurn[spreadState$pixels] <- 1
   sim$burnMap[spreadState$pixels] <- sim$burnMap[spreadState$pixels] + 1
-  par("pin" = pmax(par()$pin, 0)) # not sure why par$pin is negative
-  if ((time(sim) - start(sim) ) %% P(sim)$.plotInterval < 1) {
-    Plots(c(sim$rstAnnualBurnID |> setNames(paste0("Annual Fire IDs ", time(sim))),
-            sim$burnMap |> setNames(paste0("Cumulative Burn Map ", time(sim))),
-            sim$fireSense_SpreadPredicted |> setNames(paste0("Spread Probability Map ", time(sim)))),
-          types = Par$.plots, filename = paste0("Annual Fire Maps ", time(sim)),
-          deviceArgs = list(width = 10, height = 8, units = "in", res = 144))
-  }
+  sim <- plotBurnMaps(sim)
 
   #get fire year, pixels burned, area burned, poly ID of all burned pixels
   # Make burnSummary --> similar to SCFM
@@ -380,6 +374,29 @@ burn <- function(sim) {
   sim$burnSummary <- rbind(sim$burnSummary, tempDT)
 
   invisible(sim)
+}
+
+#' The year's burn maps, every `.plotInterval` years
+#'
+#' The annual fire IDs (empty in a year without fire), the cumulative burn map and, when
+#' fireSense_spreadPredict made it, the year's spread probability, through `Plots(types = .plots)`. Called on
+#' every way out of `burn()`: a plot year without fire is drawn too, because the cumulative map is in it.
+#'
+#' @param sim A `simList`.
+#'
+#' @return `sim`, with the figure in `outputs(sim)` when it is saved.
+plotBurnMaps <- function(sim) {
+  if ((time(sim) - start(sim)) %% P(sim)$.plotInterval >= 1 || !anyPlotting(P(sim)$.plots))
+    return(sim)
+  maps <- Filter(Negate(is.null), list(
+    sim$rstAnnualBurnID |> setNames(paste0("Annual Fire IDs ", time(sim))),
+    if (!is.null(sim$burnMap)) sim$burnMap |> setNames(paste0("Cumulative Burn Map ", time(sim))),
+    if (!is.null(sim$fireSense_SpreadPredicted))
+      sim$fireSense_SpreadPredicted |> setNames(paste0("Spread Probability Map ", time(sim)))))
+  par("pin" = pmax(par()$pin, 0)) # not sure why par$pin is negative
+  Plots(do.call(c, maps), types = P(sim)$.plots, filename = paste0("Annual Fire Maps ", time(sim)),
+        deviceArgs = list(width = 10, height = 8, units = "in", res = 144))
+  sim
 }
 
 #' Draw a count from its fitted distribution
