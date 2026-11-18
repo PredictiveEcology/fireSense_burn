@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="index.html">fireSense_burn</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9018</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9019</span>
       </span>
     </div>
 
@@ -164,7 +164,7 @@ fireSense_IgAndEscapeProbRas
 SpatRaster
 </td>
 <td style="text-align:left;">
-Two layers at the resolution of <code>ignitionFitRTM</code>, from fireSense_ignitionPredict: <code>ignitionProb</code>, the expected ignitions per pixel and year, and <code>escapeProb</code>, the expected escapes per pixel and year given an ignition. Ignitions and escapes are drawn from these each year. Optional layers <code>ignitionYearSD</code> and <code>escapeYearSD</code>: the sd of the year effect of each; a year multiplies the means by exp(sd z - sd^2 / 2), with the year’s z, which spread does not share. Absent or 0: no year effect.
+Two layers at the resolution of <code>ignitionFitRTM</code>, from fireSense_ignitionPredict: <code>ignitionProb</code>, the expected ignitions per pixel and year, and <code>escapeProb</code>, the expected escapes per pixel and year given an ignition. Ignitions and escapes are drawn from these each year. Optional layers <code>ignitionYearSD</code> and <code>escapeYearSD</code>: the sd of the year effect of each; a year multiplies the means by exp(sd z - sd^2 / 2), with the year’s z, which spread does not share. Absent or 0: no year effect. Optional layers <code>ignitionYearEffect</code> and <code>escapeYearEffect</code>: the year’s fitted multipliers, used instead with <code>yearEffects = "fitted"</code>, and <code>ignitionYearEffectShape</code> and <code>escapeYearEffectShape</code>, the shapes of their gamma posteriors, from which each rep-year draws its multiplier (<code><a href="reference/yearMultipliers.html">yearMultipliers()</a></code>).
 </td>
 <td style="text-align:left;">
 NA
@@ -570,6 +570,27 @@ NA
 </td>
 <td style="text-align:left;">
 If <code>TRUE</code>, each burn event adds its rep’s ignitions (<code>rep</code>, <code>pixelID</code>, <code>escaped</code>, one row per ignition; one row with <code>pixelID</code> <code>NA</code> for a rep without any) to <code>hindcast_ignitions.csv</code> in <code>outputPath(sim)</code>, for a later <code>ignitionSource = "replay"</code>. The rep is <code>round((time(sim) - .runInitialTime) / .runInterval) + 1</code>, as fireSense_summary numbers it.
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+</tr><tr><td style="text-align:left;">
+yearEffects
+</td>
+<td style="text-align:left;">
+character
+</td>
+<td style="text-align:left;">
+draw
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+How the expected ignitions and escapes of a year get their year effect. <code>"draw"</code>: each burn event draws z and multiplies by <code>fireSenseUtils::yearEffectMultiplier(sd, z)</code> (the <code>ignitionYearSD</code> and <code>escapeYearSD</code> layers), as a forecast or NRV run must. <code>"fitted"</code> (for hindcasts of fit years only): where <code>fireSense_IgAndEscapeProbRas</code> has the layers <code>ignitionYearEffect</code> and <code>escapeYearEffect</code> (the year’s fitted multipliers, from fireSense_ignitionFit through fireSense_ignitionPredict), they are used instead; cells without one (<code>NA</code>, or no layer) keep the draw. z is drawn either way, so the random numbers that follow are the same.
 </td>
 <td style="text-align:left;">
 TRUE
