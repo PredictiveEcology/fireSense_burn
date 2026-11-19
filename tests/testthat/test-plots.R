@@ -25,9 +25,14 @@ test_that("the default .plots = \"screen\" writes no figure file", {
   expect_identical(nrow(SpaDES.core::outputs(sim)), 0L)
 })
 
-test_that("no figure is written in a year without escapes", {
-  unlink(figDir(), recursive = TRUE)
-  sim <- runFireSense(data.table::data.table(pixelID = 1L, escapes = 0L, escaped = FALSE),
-                      params = list(.plots = "png", .plotInterval = 1))
-  expect_identical(length(list.files(figDir())), 0L)
+test_that("a plot year without fire still writes its figure: the cumulative burn map is in it", {
+  ## burn() returned before Plots() when nothing burned, so a run's last plot year (2020 in LandRCBM) had no
+  ## figure, and no cumulative burn map, when it happened to burn nothing
+  for (noFire in list(data.table::data.table(pixelID = 1L, escapes = 0L, escaped = FALSE),   # no escape
+                      data.table::data.table(pixelID = integer(), escapes = integer(), escaped = logical()))) {
+    unlink(figDir(), recursive = TRUE)
+    sim <- runFireSense(noFire, params = list(.plots = "png", .plotInterval = 1))
+    expect_identical(list.files(figDir()), "Annual Fire Maps 1.png")
+    expect_identical(basename(SpaDES.core::outputs(sim)$file), "Annual Fire Maps 1.png")
+  }
 })
