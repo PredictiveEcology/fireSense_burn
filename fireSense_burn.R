@@ -18,7 +18,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_burn.Rmd"), ## same file
   reqdPkgs = list("data.table", "httr2", "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
-                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9190)", # 9190: modelledFires(); 9168: escapeProbPerIgnition(); 9162: linearLinkProb(), smooth links (#229); 9138: powerLawShape
+                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9192)", # 9192: polygonCells(); 9190: modelledFires(); 9168: escapeProbPerIgnition(); 9162: linearLinkProb(), smooth links (#229); 9138: powerLawShape
                   "ggplot2", "ggspatial", "PredictiveEcology/reproducible@development",
                   "PredictiveEcology/SpaDES.tools@development (>= 2.2.0.9004)", "terra"),
   loadOrder = list(after = c("fireSense_ignitionPredict", "fireSense_spreadPredict")),
@@ -219,7 +219,14 @@ doEvent.fireSense_burn = function(sim, eventTime, eventType, debug = FALSE) {
           (is.na(P(sim)$replayFrom) || !dir.exists(P(sim)$replayFrom)))
         stop("fireSense_burn: ignitionSource = \"replay\" needs `replayFrom`, the folder of a hindcast job; got ",
              P(sim)$replayFrom)
-      fireSenseUtils::escapeDefinitionOf(sim)
+      if (identical(P(sim)$ignitionSource, "observedPolygons")) {
+        ## the cell numbers of flammableRTM index the burn rasters, so the grids must be the same
+        for (nm in intersect(c("rasterToMatch", "fireSense_SpreadPredicted"), ls(sim)))
+          if (!terra::compareGeom(sim$flammableRTM, sim[[nm]], stopOnError = FALSE))
+            stop("fireSense_burn: ignitionSource = \"observedPolygons\" needs `flammableRTM` and `", nm,
+                 "` on the same grid (extent, resolution, crs)")
+      } else
+        fireSenseUtils::escapeDefinitionOf(sim) # the escape definition is not used by observed polygons
 
       ## trying to avoid the raster warning no non-missing arguments to max
       sim$burnMap <- rast(sim$rasterToMatch)
@@ -400,30 +407,32 @@ recordBurn <- function(sim, spreadState, tmpl) {
 #' The burnable pixels of a year's observed fires
 #'
 #' For `ignitionSource = "observedPolygons"`. Keeps the year's polygons of the modelled causes and drops prescribed
-#' burns (`fireSenseUtils::modelledFires()`; every size, not only escapes), projects them to `flammableRTM`, and
-#' rasterizes their numbers onto it with `terra::rasterize()`, as `fireSenseUtils::buildCohortBurnHistory()` does for
-#' years. A pixel under several polygons goes to the first. Only flammable pixels (`flammableRTM == 1`) are kept.
+#' burns (`fireSenseUtils::modelledFires()`; every size, not only escapes) and takes the pixels they touch with
+#' `fireSenseUtils::polygonCells()`, the lookup the fit's `burnableHa` uses (a polygon smaller than a pixel burns its
+#' one pixel). A pixel under several polygons goes to the lowest polygon number. Only flammable pixels
+#' (`flammableRTM` above 0) are kept. `YEAR` may be text; `NULL` elements of the list are dropped.
 #'
 #' @param firePolys Annual fire polygons (a list of `SpatVector`s, or one) with `YEAR` and `FIRECAUS`.
 #' @param flammableRTM Binary `SpatRaster`, 1 = burnable; its cell numbers are the pixels.
 #' @param year The fire year.
 #' @param fireCauses The cause groups to keep (`fireSenseUtils::fireSenseFireCauses`).
 #'
-#' @return A `data.table` with `initialPixels` (the lowest burnable cell of the fire) and `pixels`, one row per
-#'   burned pixel; no rows in a year without a burnable observed fire.
+#' @return A `data.table` with `initialPixels` and `pixels`, one row per burned pixel; no rows in a year without a
+#'   burnable observed fire. `initialPixels` is the fire's lowest burnable cell, not an ignition point (there is
+#'   none), so it is `igLoc` in `burnSummary` in this mode.
 observedPolygonCells <- function(firePolys, flammableRTM, year, fireCauses) {
-  polys <- if (is.list(firePolys)) do.call(rbind, unname(Filter(Negate(is.null), firePolys))) else firePolys
-  polys <- polys[which(polys$YEAR == year), ]
-  polys <- fireSenseUtils::modelledFires(polys, fireCauses, source = "nbac")
-  none <- data.table(initialPixels = integer(), pixels = integer())
-  if (!NROW(polys)) return(none)
-  polys <- terra::project(polys, terra::crs(flammableRTM))
-  polys$.fire <- seq_len(NROW(polys))
-  fireRas <- terra::rasterize(polys, flammableRTM, field = ".fire", fun = min)
-  burned <- data.table(pixels = seq_len(terra::ncell(fireRas)), fire = as.vector(terra::values(fireRas)))
-  burned <- burned[!is.na(fire) & as.vector(terra::values(flammableRTM)) %in% 1]
-  if (!NROW(burned)) return(none)
-  burned[, initialPixels := min(pixels), by = "fire"][, c("initialPixels", "pixels")]
+  ## each year's polygons of the modelled causes; YEAR may be stored as text
+  inYear <- function(p) {
+    p <- p[which(as.integer(p$YEAR) == year), ]
+    fireSenseUtils::modelledFires(p, fireCauses, source = "nbac")
+  }
+  polys <- Filter(NROW, lapply(Filter(Negate(is.null), if (is.list(firePolys)) unname(firePolys) else list(firePolys)), inYear))
+  cells <- fireSenseUtils::polygonCells(polys, flammableRTM)
+  ## burnable pixels only; a pixel under several polygons goes to the lowest polygon number
+  cells <- cells[cells$flammable, ][order(.poly)][!duplicated(pixelID)]
+  if (NROW(cells)) cells[, initialPixels := min(pixelID), by = ".poly"] else cells[, initialPixels := integer()]
+  setnames(cells, "pixelID", "pixels")
+  cells[, c("initialPixels", "pixels")]
 }
 
 #' The year's burn maps, every `.plotInterval` years

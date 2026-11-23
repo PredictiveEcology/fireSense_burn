@@ -65,3 +65,41 @@ test_that("observedPolygons needs no ignition or spread inputs, and fireCauses p
 test_that("observedPolygons needs firePolys", {
   expect_error(runFireSense(NULL, params = list(ignitionSource = "observedPolygons")), "firePolys")
 })
+
+test_that("a fire smaller than a pixel burns its one burnable pixel, as the fit counts it", {
+  ## 0.2 x 0.2 pixels at the upper-left corner of cell 56 (east block): its centre is in no cell
+  small <- toyFirePolys(56L, 1L, 1, side = 0.2)
+  expect_true(all(is.na(vals(terra::rasterize(small[[1]], toyRTM()))))) # terra::rasterize() would drop it
+  sim <- runPolygons(polys = small)
+  expect_identical(which(vals(sim$rstCurrentBurn) == 1), 56L)
+  ## on the barrier (not burnable) it burns nothing
+  sim <- runPolygons(polys = toyFirePolys(5L, 1L, 1, side = 0.2))
+  expect_true(all(is.na(vals(sim$rstCurrentBurn))))
+})
+
+test_that("observedPolygons needs flammableRTM on the grid of rasterToMatch", {
+  coarse <- toyFlammable(toyRTM(5L, 500))
+  expect_error(runFireSense(NULL, params = list(ignitionSource = "observedPolygons"),
+                            objects = list(firePolys = polysPerYear(), flammableRTM = coarse,
+                                           fireSense_SpreadPredicted = NULL)),
+               "same grid")
+})
+
+test_that("a firePolys list of NULLs burns nothing, and YEAR stored as text still matches", {
+  sim <- runPolygons(polys = list(NULL, NULL))
+  expect_true(all(is.na(vals(sim$rstCurrentBurn))))
+  polys <- polysPerYear()
+  polys[[1]]$YEAR <- as.character(polys[[1]]$YEAR)
+  sim <- runPolygons(polys = polys)
+  expect_identical(which(vals(sim$rstCurrentBurn) == 1), sort(year1Burn()))
+})
+
+test_that("a fire's burnSummary row is the same observed or predicted: igLoc is its lowest cell, area N * pixel", {
+  obs <- runPolygons(polys = toyFirePolys(1L, 1L, 250, side = 4L, causes = "Natural")) # the west block's 4 columns, rows 1-4
+  pred <- runFireSense(data.table::data.table(pixelID = 1L, escapes = 1L, escaped = TRUE))
+  expect_identical(names(obs$burnSummary), names(pred$burnSummary))
+  expect_identical(obs$burnSummary$igLoc, 1L)
+  expect_equal(obs$burnSummary$areaBurnedHa, 16 * 6.25)
+  expect_equal(pred$burnSummary$areaBurnedHa, 40 * 6.25) # the predicted path's area is unchanged: N * pixel ha
+  expect_equal(pred$burnSummary$areaBurnedHa, pred$burnSummary$N * 6.25)
+})
