@@ -1,7 +1,7 @@
 ---
 title: "fireSense_burn Manual"
 subtitle: "v.0.0.0.9000"
-date: "Last updated: 2026-11-19"
+date: "Last updated: 2026-11-23"
 output:
   bookdown::html_document2:
     toc: true
@@ -109,7 +109,7 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
   <tr>
    <td style="text-align:left;"> firePolys </td>
    <td style="text-align:left;"> list </td>
-   <td style="text-align:left;"> Only with `ignitionSource = "observedEscapes"`: the annual fire polygons (`YEAR`, `POLY_HA`, `FIRECAUS`), as in fireSense_dataPrepFit. </td>
+   <td style="text-align:left;"> Only with `ignitionSource = "observedEscapes"` or `"observedPolygons"`: the annual fire polygons (`YEAR`, `POLY_HA`, `FIRECAUS`), as in fireSense_dataPrepFit. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
@@ -252,7 +252,7 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn)
    <td style="text-align:left;"> predicted </td>
    <td style="text-align:left;"> NA </td>
    <td style="text-align:left;"> NA </td>
-   <td style="text-align:left;"> Where each year's fires start. `"predicted"`: ignitions and escapes are drawn from `fireSense_IgAndEscapeProbRas`. `"observedEscapes"` (for hindcasts that test spread alone): the year's observed escapes in `firePolys` (the escape definition, year `floor(time(sim))`) are spread from the snapped centroids of their polygons, the starts of the spread fit (`fireSenseUtils::escapeFireSet()`), and nothing is drawn from the predicted surfaces. `"replay"` (a fast hindcast that varies spread alone): each rep spreads the ignitions and escapes of the same rep of the hindcast in `replayFrom` (`readReplayIgnitions()`), and nothing is drawn. Either way a fire starts only in the core of `rasterToMatchLargeELF`; it still spreads into the buffer. </td>
+   <td style="text-align:left;"> Where each year's fires start. `"predicted"`: ignitions and escapes are drawn from `fireSense_IgAndEscapeProbRas`. `"observedEscapes"` (for hindcasts that test spread alone): the year's observed escapes in `firePolys` (the escape definition, year `floor(time(sim))`) are spread from the snapped centroids of their polygons, the starts of the spread fit (`fireSenseUtils::escapeFireSet()`), and nothing is drawn from the predicted surfaces. `"observedPolygons"` (attribution runs): the year's observed fires are burned, not simulated: the polygons of `firePolys` of the year `floor(time(sim))`, of `fireCauses` and not prescribed burns (`fireSenseUtils::modelledFires()`), burn every burnable pixel they cover, in the core and the buffer. Ignition, escape and spread are skipped, so none of their fitted inputs is needed. `"replay"` (a fast hindcast that varies spread alone): each rep spreads the ignitions and escapes of the same rep of the hindcast in `replayFrom` (`readReplayIgnitions()`), and nothing is drawn. Either way a fire starts only in the core of `rasterToMatchLargeELF`; it still spreads into the buffer. </td>
    <td style="text-align:left;"> TRUE </td>
   </tr>
   <tr>
@@ -317,6 +317,7 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn)
 - `init`: creates `burnMap` (0 where flammable, `NA` elsewhere) and schedules the first `burn` at `.runInitialTime`.
 - `burn`: draws the year's ignitions and escapes, then spreads fires from every pixel with `escaped`, updates the outputs, and reschedules itself every `.runInterval` years.
   Nothing burns in a year with no escapes, or if `whichModulesToPrepare` does not include `fireSense_spreadPredict`.
+  With `ignitionSource = "observedPolygons"` (attribution runs) nothing is drawn or spread: the year's observed fires of `firePolys` (cause in `fireCauses`, no prescribed burn) burn every burnable pixel they cover, and the fitted ignition and spread inputs are not needed.
 
 ### Plotting
 
