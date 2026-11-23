@@ -76,6 +76,7 @@ knitr::kable(df_params, caption = "List of (ref:fireSense_burn) parameters and t
 - `init`: creates `burnMap` (0 where flammable, `NA` elsewhere) and schedules the first `burn` at `.runInitialTime`.
 - `burn`: draws the year's ignitions and escapes, then spreads fires from every pixel with `escaped`, updates the outputs, and reschedules itself every `.runInterval` years.
   Nothing burns in a year with no escapes, or if `whichModulesToPrepare` does not include `fireSense_spreadPredict`.
+  With `ignitionSource = "observedPolygons"` (attribution runs) nothing is drawn or spread: the year's observed fires of `firePolys` (cause in `fireCauses`, no prescribed burn) burn every burnable pixel they cover, and the fitted ignition and spread inputs are not needed.
 
 ### Plotting
 

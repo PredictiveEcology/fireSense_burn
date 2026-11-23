@@ -85,6 +85,24 @@ predictedSurfaces <- function(ign = 5, esc = 5) {
        ignitionFitRTM = coarse)
 }
 
+## fire polygons: a square of `side` pixels (all of them burnable) whose upper-left pixel is `cell`, with the fire's
+## year and its whole size, its cause and, if given, `PRESCRIBED`
+toyFirePolys <- function(cells, years, sizesHa, side = 3L, rtm = toyRTM(), causes = "Natural", prescribed = NULL) {
+  xy <- terra::xyFromCell(rtm, cells)
+  w <- terra::res(rtm)[1] * side
+  one <- function(i) {   # cell `i` is the polygon's upper-left pixel
+    x0 <- xy[i, 1] - 125; x1 <- x0 + w; y1 <- xy[i, 2] + 125; y0 <- y1 - w
+    terra::vect(sprintf("POLYGON((%f %f, %f %f, %f %f, %f %f, %f %f))", x0, y0, x1, y0, x1, y1, x0, y1, x0, y0),
+                crs = terra::crs(rtm))
+  }
+  p <- do.call(rbind, lapply(seq_along(cells), one))
+  p$YEAR <- years
+  p$POLY_HA <- sizesHa
+  p$FIRECAUS <- causes
+  if (!is.null(prescribed)) p$PRESCRIBED <- prescribed
+  list(p)
+}
+
 ## `postProcess()` is called by the module (coarseToFineMap()); in a project `reproducible` is attached
 ## from the module's reqdPkgs.
 suppressPackageStartupMessages(library(reproducible))

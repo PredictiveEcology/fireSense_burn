@@ -18,7 +18,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.md", "fireSense_burn.Rmd"), ## same file
   reqdPkgs = list("data.table", "httr2", "PredictiveEcology/SpaDES.core@development (>= 3.0.4)",
-                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9168)", # 9168: escapeProbPerIgnition(); 9162: linearLinkProb(), smooth links (#229); 9138: powerLawShape
+                  "PredictiveEcology/fireSenseUtils@development (>= 0.2.3.9190)", # 9190: modelledFires(); 9168: escapeProbPerIgnition(); 9162: linearLinkProb(), smooth links (#229); 9138: powerLawShape
                   "ggplot2", "ggspatial", "PredictiveEcology/reproducible@development",
                   "PredictiveEcology/SpaDES.tools@development (>= 2.2.0.9004)", "terra"),
   loadOrder = list(after = c("fireSense_ignitionPredict", "fireSense_spreadPredict")),
@@ -52,6 +52,10 @@ defineModule(sim, list(
                           "the year's observed escapes in `firePolys` (the escape definition, year `floor(time(sim))`) are spread",
                           "from the snapped centroids of their polygons, the starts of the spread fit",
                           "(`fireSenseUtils::escapeFireSet()`), and nothing is drawn from the predicted surfaces.",
+                          "`\"observedPolygons\"` (attribution runs): the year's observed fires are burned, not simulated: the",
+                          "polygons of `firePolys` of the year `floor(time(sim))`, of `fireCauses` and not prescribed burns",
+                          "(`fireSenseUtils::modelledFires()`), burn every burnable pixel they cover, in the core and the buffer.",
+                          "Ignition, escape and spread are skipped, so none of their fitted inputs is needed.",
                           "`\"replay\"` (a fast hindcast that varies spread alone): each rep spreads the ignitions and escapes",
                           "of the same rep of the hindcast in `replayFrom` (`readReplayIgnitions()`), and nothing is drawn.",
                           "Either way a fire starts only in the core of `rasterToMatchLargeELF`; it still spreads into the buffer.")),
@@ -129,7 +133,7 @@ defineModule(sim, list(
                  paste("`list(ignition = , escape = )`, from fireSense_ignitionPredict: the objective the ignition and",
                        "escape models were fitted with. Only `\"count:poisson\"` can be drawn from.")),
     expectsInput("firePolys", "list",
-                 paste("Only with `ignitionSource = \"observedEscapes\"`: the annual fire polygons (`YEAR`, `POLY_HA`,",
+                 paste("Only with `ignitionSource = \"observedEscapes\"` or `\"observedPolygons\"`: the annual fire polygons (`YEAR`, `POLY_HA`,",
                        "`FIRECAUS`), as in fireSense_dataPrepFit.")),
     expectsInput("fireSense_SpreadFireSD", "SpatRaster|numeric",
                  paste("From fireSense_spreadPredict: the sd of the per-fire random effect on the linear predictor x of a",
@@ -206,11 +210,11 @@ doEvent.fireSense_burn = function(sim, eventTime, eventType, debug = FALSE) {
         stopifnot(length(na.omit(sim$fireSense_SpreadPredicted[])) > 0)
       if (!P(sim)$yearEffects %in% c("draw", "fitted"))
         stop("fireSense_burn: yearEffects must be \"draw\" or \"fitted\"")
-      if (!P(sim)$ignitionSource %in% c("predicted", "observedEscapes", "replay"))
-        stop("fireSense_burn: ignitionSource must be \"predicted\", \"observedEscapes\" or \"replay\"")
-      if (identical(P(sim)$ignitionSource, "observedEscapes") &&
+      if (!P(sim)$ignitionSource %in% c("predicted", "observedEscapes", "observedPolygons", "replay"))
+        stop("fireSense_burn: ignitionSource must be \"predicted\", \"observedEscapes\", \"observedPolygons\" or \"replay\"")
+      if (P(sim)$ignitionSource %in% c("observedEscapes", "observedPolygons") &&
           is.null(sim$firePolys))
-        stop("fireSense_burn: ignitionSource = \"observedEscapes\" needs `firePolys`")
+        stop("fireSense_burn: ignitionSource = \"", P(sim)$ignitionSource, "\" needs `firePolys`")
       if (identical(P(sim)$ignitionSource, "replay") &&
           (is.na(P(sim)$replayFrom) || !dir.exists(P(sim)$replayFrom)))
         stop("fireSense_burn: ignitionSource = \"replay\" needs `replayFrom`, the folder of a hindcast job; got ",
@@ -272,6 +276,12 @@ burn <- function(sim) {
   tmpl <- if (!is.null(sim$fireSense_SpreadPredicted)) sim$fireSense_SpreadPredicted else sim$rasterToMatch
   sim$rstCurrentBurn <- emptyBurnRaster(tmpl)
   sim$rstAnnualBurnID <- emptyBurnRaster(tmpl)
+
+  ## The year's observed fires burn as they are: no ignition, escape or spread, and none of their inputs.
+  if (identical(Par$ignitionSource, "observedPolygons")) {
+    cells <- observedPolygonCells(sim$firePolys, sim$flammableRTM, floor(time(sim) + 1e-9), Par$fireCauses)
+    return(invisible(recordBurn(sim, cells, tmpl)))
+  }
 
   ## Every random draw of ignitions and escapes is made here, from the surfaces fireSense_ignitionPredict
   ## predicts. Without the surface, a supplied `ignitionsAndEscapes` is spread as it is.
@@ -355,8 +365,21 @@ burn <- function(sim) {
   spreadState <- rbind(spreadState, smallFires(
     loci = ig$pixelID[!ig$escaped %in% TRUE], sizesHa = sim$nonEscapedFireSizesHa,
     landscape = sim$fireSense_SpreadPredicted, spreadProb = spreadProbYear, burned = spreadState$pixels))
-  if (NROW(spreadState) == 0L) return(invisible(plotBurnMaps(sim)))
+  invisible(recordBurn(sim, spreadState, tmpl))
+}
 
+#' Record the year's burned pixels in the burn outputs
+#'
+#' Numbers the fires, sets `rstAnnualBurnID`, `rstCurrentBurn` and the cumulative `burnMap`, draws the maps, and
+#' adds the fires to `burnDT` and `burnSummary` (similar to SCFM): fire year, pixels burned, area burned.
+#'
+#' @param sim A `simList`.
+#' @param spreadState A `data.table` with `initialPixels` (the fire's start) and `pixels` (every pixel it burned).
+#' @param tmpl The raster of the burn grid (for the pixel size).
+#'
+#' @return `sim`, with `burnDT`, `burnMap`, `burnSummary`, `rstAnnualBurnID` and `rstCurrentBurn` updated.
+recordBurn <- function(sim, spreadState, tmpl) {
+  if (NROW(spreadState) == 0L) return(plotBurnMaps(sim))
   spreadState[ , fire_id := .GRP, by = "initialPixels"] # Add an fire_id column
   sim$rstAnnualBurnID[spreadState$pixels] <- spreadState$fire_id
   sim$rstCurrentBurn[spreadState$pixels] <- 1
@@ -364,16 +387,43 @@ burn <- function(sim) {
   sim <- plotBurnMaps(sim)
 
   #get fire year, pixels burned, area burned, poly ID of all burned pixels
-  # Make burnSummary --> similar to SCFM
   sim$burnDT <- spreadState
 
   tempDT <- sim$burnDT[, .(.N), by = "initialPixels"]
   tempDT$year <- time(sim)
-  tempDT$areaBurnedHa <- tempDT$N * prod(res(sim$fireSense_SpreadPredicted)) * 1e-4
+  tempDT$areaBurnedHa <- tempDT$N * prod(res(tmpl)) * 1e-4
   setnames(tempDT, c("initialPixels"), c("igLoc"))
   sim$burnSummary <- rbind(sim$burnSummary, tempDT)
+  sim
+}
 
-  invisible(sim)
+#' The burnable pixels of a year's observed fires
+#'
+#' For `ignitionSource = "observedPolygons"`. Keeps the year's polygons of the modelled causes and drops prescribed
+#' burns (`fireSenseUtils::modelledFires()`; every size, not only escapes), projects them to `flammableRTM`, and
+#' rasterizes their numbers onto it with `terra::rasterize()`, as `fireSenseUtils::buildCohortBurnHistory()` does for
+#' years. A pixel under several polygons goes to the first. Only flammable pixels (`flammableRTM == 1`) are kept.
+#'
+#' @param firePolys Annual fire polygons (a list of `SpatVector`s, or one) with `YEAR` and `FIRECAUS`.
+#' @param flammableRTM Binary `SpatRaster`, 1 = burnable; its cell numbers are the pixels.
+#' @param year The fire year.
+#' @param fireCauses The cause groups to keep (`fireSenseUtils::fireSenseFireCauses`).
+#'
+#' @return A `data.table` with `initialPixels` (the lowest burnable cell of the fire) and `pixels`, one row per
+#'   burned pixel; no rows in a year without a burnable observed fire.
+observedPolygonCells <- function(firePolys, flammableRTM, year, fireCauses) {
+  polys <- if (is.list(firePolys)) do.call(rbind, unname(Filter(Negate(is.null), firePolys))) else firePolys
+  polys <- polys[which(polys$YEAR == year), ]
+  polys <- fireSenseUtils::modelledFires(polys, fireCauses, source = "nbac")
+  none <- data.table(initialPixels = integer(), pixels = integer())
+  if (!NROW(polys)) return(none)
+  polys <- terra::project(polys, terra::crs(flammableRTM))
+  polys$.fire <- seq_len(NROW(polys))
+  fireRas <- terra::rasterize(polys, flammableRTM, field = ".fire", fun = min)
+  burned <- data.table(pixels = seq_len(terra::ncell(fireRas)), fire = as.vector(terra::values(fireRas)))
+  burned <- burned[!is.na(fire) & as.vector(terra::values(flammableRTM)) %in% 1]
+  if (!NROW(burned)) return(none)
+  burned[, initialPixels := min(pixels), by = "fire"][, c("initialPixels", "pixels")]
 }
 
 #' The year's burn maps, every `.plotInterval` years
@@ -957,7 +1007,8 @@ placeIgnitions <- function(igs, drawTable) {
 #'
 #' @return The `simList`, invisibly.
 .inputObjects <- function(sim) {
-  if (!suppliedElsewhere("nonEscapedFireSizesHa", sim) && !is.null(sim$studyArea)) {
+  if (!suppliedElsewhere("nonEscapedFireSizesHa", sim) && !is.null(sim$studyArea) &&
+      !identical(P(sim)$ignitionSource, "observedPolygons")) {
     shp <- fireSenseUtils::fireRecordShapefile(fireSenseUtils::nfdbPointUrl(), destinationPath = inputPath(sim))
     pts <- fireSenseUtils::nfdbFirePointsOfCauses(shp, studyArea = sim$studyArea, years = P(sim)$fireYears,
                                                   causes = P(sim)$fireCauses)
