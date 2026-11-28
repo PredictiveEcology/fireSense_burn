@@ -46,6 +46,13 @@ defineModule(sim, list(
     defineParameter("fireYears", "integer", fireSenseUtils::defaultFireYears(), NA, NA,
                     paste("As in `fireSense_dataPrepFit`: the years of those observed fires, when `.inputObjects`",
                           "makes `nonEscapedFireSizesHa`.")),
+    defineParameter("observedStartLocation", "character", "centroid", NA, NA,
+                    paste("Only with `ignitionSource = \"observedEscapes\"`: where each observed escape starts.",
+                          "`\"centroid\"` (default): the snapped centroid of its polygon, the spread fit's start.",
+                          "`\"ignitionPoint\"`: the NFDB ignition point (`ignitionFirePoints`) that matches its polygon",
+                          "(`fireSenseUtils::ignitionPolygonPairs()`: in the polygon or within 1 km, the point inside and",
+                          "then the largest `SIZE_HA` first), moved to the nearest burnable pixel of the fire if it is not on one.",
+                          "An escape with no matched point starts at its snapped centroid, and a message counts them.")),
     defineParameter("ignitionSource", "character", "predicted", NA, NA,
                     paste("Where each year's fires start. `\"predicted\"`: ignitions and escapes are drawn from",
                           "`fireSense_IgAndEscapeProbRas`. `\"observedEscapes\"` (for hindcasts that test spread alone):",
@@ -159,8 +166,12 @@ defineModule(sim, list(
                        "from these. Unsupplied, with a `studyArea` (a run without fireSense_dataPrepFit), `.inputObjects`",
                        "makes them the same way, from the NFDB fires of `fireCauses` in `fireYears`. `NULL`: ignitions",
                        "that did not escape burn nothing.")),
+    expectsInput("ignitionFirePoints", "SpatVector",
+                 paste("Only with `ignitionSource = \"observedEscapes\"` and `observedStartLocation = \"ignitionPoint\"`:",
+                       "the NFDB ignition points (`YEAR`, `SIZE_HA`), as in fireSense_dataPrepFit. Unsupplied, with a",
+                       "`studyArea`, `.inputObjects` makes them from the NFDB fires of `fireCauses` in `fireYears`.")),
     expectsInput("studyArea", "SpatVector",
-                 "Only for making `nonEscapedFireSizesHa`: the study area whose NFDB fires give the sizes."),
+                 "Only for making `nonEscapedFireSizesHa` and `ignitionFirePoints`: the study area whose NFDB fires give the sizes."),
     expectsInput("rasterToMatch", "SpatRaster", sourceURL = NA,
                  "Template raster for the study area, ideally buffered to limit fire edge effects.")
   ),
@@ -215,6 +226,11 @@ doEvent.fireSense_burn = function(sim, eventTime, eventType, debug = FALSE) {
       if (P(sim)$ignitionSource %in% c("observedEscapes", "observedPolygons") &&
           is.null(sim$firePolys))
         stop("fireSense_burn: ignitionSource = \"", P(sim)$ignitionSource, "\" needs `firePolys`")
+      if (!P(sim)$observedStartLocation %in% c("centroid", "ignitionPoint"))
+        stop("fireSense_burn: observedStartLocation must be \"centroid\" or \"ignitionPoint\"")
+      if (identical(P(sim)$ignitionSource, "observedEscapes") &&
+          identical(P(sim)$observedStartLocation, "ignitionPoint") && is.null(sim$ignitionFirePoints))
+        stop("fireSense_burn: observedStartLocation = \"ignitionPoint\" needs `ignitionFirePoints` (or a `studyArea` to make them from)")
       if (identical(P(sim)$ignitionSource, "replay") &&
           (is.na(P(sim)$replayFrom) || !dir.exists(P(sim)$replayFrom)))
         stop("fireSense_burn: ignitionSource = \"replay\" needs `replayFrom`, the folder of a hindcast job; got ",
@@ -307,7 +323,9 @@ burn <- function(sim) {
   if (identical(Par$ignitionSource, "observedEscapes")) {
     ## the starts of the year's observed escapes: the spread fit's, found once (all years) and kept in `mod`
     if (is.null(mod$observedStarts))
-      mod$observedStarts <- observedEscapeStarts(sim$firePolys, sim$flammableRTM, definition)
+      mod$observedStarts <- observedEscapeStarts(sim$firePolys, sim$flammableRTM, definition,
+                                                 points = if (identical(Par$observedStartLocation, "ignitionPoint"))
+                                                   sim$ignitionFirePoints)
     sim$ignitionsAndEscapes <- observedEscapes(mod$observedStarts, floor(time(sim) + 1e-9))
   } else if (identical(Par$ignitionSource, "replay")) {
     ## every rep of the reference, read once and kept in `mod`
@@ -567,20 +585,65 @@ drawIgnitionsAndEscapes <- function(sim, store, z = NULL, fitted = FALSE) {
   pixelID_igs[randomOrder, ] #Randomize order
 }
 
-#' The starts of every observed escape, the spread fit's
+#' The starts of every observed escape
 #'
-#' `fireSenseUtils::escapeFireSet()` with the escape definition (`escapeSizeHa`, `fireCauses`) and `starts = NULL`:
-#' each escape polygon's centroid moved to the nearest burnable pixel of the fire, as the spread fit has it, never an
-#' NFDB point. Starts in the buffer are dropped later, with those of predicted fires (`fireSenseUtils::inELFCore()`).
+#' By default the spread fit's: `fireSenseUtils::escapeFireSet()` with the escape definition (`escapeSizeHa`,
+#' `fireCauses`) and `starts = NULL`, each escape polygon's centroid moved to the nearest burnable pixel of the fire.
+#' With `points`, an escape starts at the NFDB ignition point that matches its polygon
+#' (`fireSenseUtils::ignitionPolygonPairs()`; of several, the one inside the polygon, then the largest `SIZE_HA`),
+#' moved by `fireSenseUtils::cleanUpSpreadFirePoints()` to the nearest burnable pixel of the fire if it is not on one;
+#' an escape with no matched point keeps its snapped centroid, and a message counts them. Starts in the buffer are
+#' dropped later, with those of predicted fires (`fireSenseUtils::inELFCore()`).
 #'
 #' @param firePolys Annual fire polygons (a list of `SpatVector`s, or one) with `YEAR`, `POLY_HA` and `FIRECAUS`.
 #' @param flammableRTM `SpatRaster` of the burnable pixels, core and buffer; its cell numbers are `pixelID`.
 #' @param definition The escape definition, from `fireSenseUtils::escapeDefinitionOf()`.
+#' @param points `NULL` (the snapped centroids) or the NFDB ignition points (`SpatVector` with `YEAR` and `SIZE_HA`).
 #'
 #' @return A `data.table` with `YEAR` and `pixelID`, one row per escape.
-observedEscapeStarts <- function(firePolys, flammableRTM, definition) {
+observedEscapeStarts <- function(firePolys, flammableRTM, definition, points = NULL) {
   st <- fireSenseUtils::escapeFireSet(firePolys, flammableRTM, definition = definition)
-  data.table(YEAR = as.integer(st$YEAR), pixelID = as.integer(st$pixelID))
+  pixelID <- as.integer(st$pixelID)
+  if (!is.null(points) && NROW(st)) {
+    polys <- if (is.list(firePolys)) do.call(rbind, unname(Filter(Negate(is.null), firePolys))) else firePolys
+    polys <- terra::project(polys, terra::crs(flammableRTM))
+    polys$.poly <- seq_len(NROW(polys))
+    pt <- ignitionPointStarts(points, polys, st$.poly, flammableRTM, definition)
+    at <- match(st$.poly, pt$.poly)
+    if (anyNA(at))
+      message("fireSense_burn: ", sum(is.na(at)), " of ", length(at), " observed escapes have no NFDB ignition point; ",
+              "they start at the snapped centroid of their polygon")
+    pixelID <- ifelse(is.na(at), pixelID, as.integer(pt$pixelID)[at])
+  }
+  data.table(YEAR = as.integer(st$YEAR), pixelID = pixelID)
+}
+
+#' The NFDB ignition point of each escape polygon, on a burnable pixel
+#'
+#' @param points NFDB ignition points (`SpatVector` with `YEAR` and `SIZE_HA`).
+#' @param polys All fire polygons (`SpatVector` on the grid of `flammableRTM`) with `.poly`, their row.
+#' @param escapePolys The `.poly` of the polygons that are escapes (`fireSenseUtils::escapeFireSet()`'s).
+#' @param flammableRTM `SpatRaster` of the burnable pixels.
+#' @param definition The escape definition.
+#'
+#' @return `fireSenseUtils::escapeFireSet()`'s starts of the escapes that have a matched point: `.poly` and `pixelID`.
+ignitionPointStarts <- function(points, polys, escapePolys, flammableRTM, definition) {
+  m <- fireSenseUtils::ignitionPolygonPairs(points, polys, definition$escapeSizeHa,
+                                            fireSenseUtils::pixelAreaHa(flammableRTM),
+                                            sizeCol = fireSenseUtils::polySizeColTxt)
+  pr <- data.table(point = m$pairs[, "point"], poly = m$polys$.poly[m$pairs[, "poly"]], inside = m$pairs[, "inside"])
+  pr <- pr[poly %in% escapePolys]
+  if (!NROW(pr)) return(data.table(.poly = integer(), pixelID = integer()))
+  pr[, size := m$points$SIZE_HA[point]]
+  pr <- pr[order(poly, -inside, -size, point), ][, .SD[1L], by = "poly"]
+  pts <- terra::project(m$points[pr$point, ], terra::crs(flammableRTM))
+  pts$.poly <- pr$poly
+  cl <- fireSenseUtils::polygonCells(polys[polys$.poly %in% pr$poly, ], flammableRTM)
+  snapped <- fireSenseUtils::cleanUpSpreadFirePoints(sf::st_as_sf(pts), cl[, list(pixelID, ids = .poly, buffer = 1L)],
+                                                     flammableRTM, idCol = ".poly")$SpatialPoints
+  st <- fireSenseUtils::escapeFireSet(polys, flammableRTM, definition = definition, starts = terra::vect(snapped),
+                                      idCol = ".poly")
+  data.table(.poly = st$.poly, pixelID = st$pixelID)
 }
 
 #' A year's observed escapes, as ignitions to spread
@@ -1008,20 +1071,25 @@ placeIgnitions <- function(igs, drawTable) {
 
 #' Supply default inputs
 #'
-#' `nonEscapedFireSizesHa`, in a run without `fireSense_dataPrepFit` (which makes it): the sizes of the
-#' study area's NFDB fires (of `fireCauses`, in `fireYears`) below `escapeSizeHa`. Without them every
-#' ignition that did not escape burned nothing in a run that only predicts. Not without a `studyArea`.
+#' In a run without `fireSense_dataPrepFit` (which makes them), from the NFDB fires of the `studyArea` (of
+#' `fireCauses`, in `fireYears`; `fireSenseUtils::nfdbFirePointsOfCauses()`): `nonEscapedFireSizesHa`, the sizes
+#' below `escapeSizeHa` (without them every ignition that did not escape burned nothing in a run that only
+#' predicts), and, for `observedStartLocation = "ignitionPoint"`, `ignitionFirePoints`. Not without a `studyArea`.
 #'
 #' @param sim A `simList`.
 #'
 #' @return The `simList`, invisibly.
 .inputObjects <- function(sim) {
-  if (!suppliedElsewhere("nonEscapedFireSizesHa", sim) && !is.null(sim$studyArea) &&
-      !identical(P(sim)$ignitionSource, "observedPolygons")) {
+  needSizes <- !suppliedElsewhere("nonEscapedFireSizesHa", sim) && !is.null(sim$studyArea) &&
+    !identical(P(sim)$ignitionSource, "observedPolygons")
+  needPoints <- !suppliedElsewhere("ignitionFirePoints", sim) && !is.null(sim$studyArea) &&
+    identical(P(sim)$ignitionSource, "observedEscapes") && identical(P(sim)$observedStartLocation, "ignitionPoint")
+  if (needSizes || needPoints) {
     shp <- fireSenseUtils::fireRecordShapefile(fireSenseUtils::nfdbPointUrl(), destinationPath = inputPath(sim))
     pts <- fireSenseUtils::nfdbFirePointsOfCauses(shp, studyArea = sim$studyArea, years = P(sim)$fireYears,
                                                   causes = P(sim)$fireCauses)
-    sim$nonEscapedFireSizesHa <- fireSenseUtils::nonEscapedFireSizes(pts, P(sim)$escapeSizeHa)
+    if (needSizes) sim$nonEscapedFireSizesHa <- fireSenseUtils::nonEscapedFireSizes(pts, P(sim)$escapeSizeHa)
+    if (needPoints) sim$ignitionFirePoints <- pts
   }
   invisible(sim)
 }
