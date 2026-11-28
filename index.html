@@ -32,7 +32,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="index.html">fireSense_burn</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9019</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9020</span>
       </span>
     </div>
 
@@ -233,7 +233,7 @@ firePolys
 list
 </td>
 <td style="text-align:left;">
-Only with <code>ignitionSource = "observedEscapes"</code>: the annual fire polygons (<code>YEAR</code>, <code>POLY_HA</code>, <code>FIRECAUS</code>), as in fireSense_dataPrepFit.
+Only with <code>ignitionSource = "observedEscapes"</code> or <code>"observedPolygons"</code>: the annual fire polygons (<code>YEAR</code>, <code>POLY_HA</code>, <code>FIRECAUS</code>), as in fireSense_dataPrepFit.
 </td>
 <td style="text-align:left;">
 NA
@@ -569,7 +569,7 @@ NA
 NA
 </td>
 <td style="text-align:left;">
-Where each year’s fires start. <code>"predicted"</code>: ignitions and escapes are drawn from <code>fireSense_IgAndEscapeProbRas</code>. <code>"observedEscapes"</code> (for hindcasts that test spread alone): the year’s observed escapes in <code>firePolys</code> (the escape definition, year <code>floor(time(sim))</code>) are spread from the snapped centroids of their polygons, the starts of the spread fit (<code><a href="https://rdrr.io/pkg/fireSenseUtils/man/fireStarts.html" class="external-link">fireSenseUtils::escapeFireSet()</a></code>), and nothing is drawn from the predicted surfaces. <code>"replay"</code> (a fast hindcast that varies spread alone): each rep spreads the ignitions and escapes of the same rep of the hindcast in <code>replayFrom</code> (<code><a href="reference/readReplayIgnitions.html">readReplayIgnitions()</a></code>), and nothing is drawn. Either way a fire starts only in the core of <code>rasterToMatchLargeELF</code>; it still spreads into the buffer.
+Where each year’s fires start. <code>"predicted"</code>: ignitions and escapes are drawn from <code>fireSense_IgAndEscapeProbRas</code>. <code>"observedEscapes"</code> (for hindcasts that test spread alone): the year’s observed escapes in <code>firePolys</code> (the escape definition, year <code>floor(time(sim))</code>) are spread from the snapped centroids of their polygons, the starts of the spread fit (<code><a href="https://rdrr.io/pkg/fireSenseUtils/man/fireStarts.html" class="external-link">fireSenseUtils::escapeFireSet()</a></code>), and nothing is drawn from the predicted surfaces. <code>"observedPolygons"</code> (attribution runs): the year’s observed fires are burned, not simulated: the polygons of <code>firePolys</code> of the year <code>floor(time(sim))</code>, of <code>fireCauses</code> and not prescribed burns (<code><a href="https://rdrr.io/pkg/fireSenseUtils/man/modelledFires.html" class="external-link">fireSenseUtils::modelledFires()</a></code>), burn every burnable pixel they cover, in the core and the buffer. Ignition, escape and spread are skipped, so none of their fitted inputs is needed. <code>"replay"</code> (a fast hindcast that varies spread alone): each rep spreads the ignitions and escapes of the same rep of the hindcast in <code>replayFrom</code> (<code><a href="reference/readReplayIgnitions.html">readReplayIgnitions()</a></code>), and nothing is drawn. Either way a fire starts only in the core of <code>rasterToMatchLargeELF</code>; it still spreads into the buffer.
 </td>
 <td style="text-align:left;">
 TRUE
@@ -723,7 +723,7 @@ TRUE
 <li>
 <code>init</code>: creates <code>burnMap</code> (0 where flammable, <code>NA</code> elsewhere) and schedules the first <code>burn</code> at <code>.runInitialTime</code>.</li>
 <li>
-<code>burn</code>: draws the year’s ignitions and escapes, then spreads fires from every pixel with <code>escaped</code>, updates the outputs, and reschedules itself every <code>.runInterval</code> years. Nothing burns in a year with no escapes, or if <code>whichModulesToPrepare</code> does not include <code>fireSense_spreadPredict</code>.</li>
+<code>burn</code>: draws the year’s ignitions and escapes, then spreads fires from every pixel with <code>escaped</code>, updates the outputs, and reschedules itself every <code>.runInterval</code> years. Nothing burns in a year with no escapes, or if <code>whichModulesToPrepare</code> does not include <code>fireSense_spreadPredict</code>. With <code>ignitionSource = "observedPolygons"</code> (attribution runs) nothing is drawn or spread: the year’s observed fires of <code>firePolys</code> (cause in <code>fireCauses</code>, no prescribed burn) burn every burnable pixel they cover, and the fitted ignition and spread inputs are not needed.</li>
 </ul>
 </div>
 <div class="section level3">

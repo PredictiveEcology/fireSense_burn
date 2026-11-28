@@ -31,7 +31,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">fireSense_burn</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9019</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">2.2.0.9020</span>
       </span>
     </div>
 
@@ -72,7 +72,7 @@
       <h1 data-toc-skip>fireSense_burn Manual</h1>
             <h3 data-toc-skip class="subtitle">v.0.0.0.9000</h3>
             
-            <h4 data-toc-skip class="date">Last updated: 2026-11-23</h4>
+            <h4 data-toc-skip class="date">Last updated: 2026-11-28</h4>
       
 
       <div class="hidden name"><code>fireSense_burn.Rmd</code></div>
@@ -326,13 +326,27 @@ NA
 </tr>
 <tr>
 <td style="text-align:left;">
+ignitionFirePoints
+</td>
+<td style="text-align:left;">
+SpatVector
+</td>
+<td style="text-align:left;">
+Only with <code>ignitionSource = "observedEscapes"</code> and <code>observedStartLocation = "ignitionPoint"</code>: the NFDB ignition points (<code>YEAR</code>, <code>SIZE_HA</code>), as in fireSense_dataPrepFit. Unsupplied, with a <code>studyArea</code>, <code>.inputObjects</code> makes them from the NFDB fires of <code>fireCauses</code> in <code>fireYears</code>.
+</td>
+<td style="text-align:left;">
+NA
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
 studyArea
 </td>
 <td style="text-align:left;">
 SpatVector
 </td>
 <td style="text-align:left;">
-Only for making <code>nonEscapedFireSizesHa</code>: the study area whose NFDB fires give the sizes.
+Only for making <code>nonEscapedFireSizesHa</code> and <code>ignitionFirePoints</code>: the study area whose NFDB fires give the sizes.
 </td>
 <td style="text-align:left;">
 NA
@@ -562,6 +576,29 @@ NA
 </td>
 <td style="text-align:left;">
 As in <code>fireSense_dataPrepFit</code>: the years of those observed fires, when <code>.inputObjects</code> makes <code>nonEscapedFireSizesHa</code>.
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+observedStartLocation
+</td>
+<td style="text-align:left;">
+character
+</td>
+<td style="text-align:left;">
+centroid
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+NA
+</td>
+<td style="text-align:left;">
+Only with <code>ignitionSource = "observedEscapes"</code>: where each observed escape starts. <code>"centroid"</code> (default): the snapped centroid of its polygon, the spread fit’s start. <code>"ignitionPoint"</code>: the NFDB ignition point (<code>ignitionFirePoints</code>) that matches its polygon (<code><a href="https://rdrr.io/pkg/fireSenseUtils/man/ignitionPolygonPairs.html" class="external-link">fireSenseUtils::ignitionPolygonPairs()</a></code>: in the polygon or within 1 km, the point inside and then the largest <code>SIZE_HA</code> first), moved to the nearest burnable pixel of the fire if it is not on one. An escape with no matched point starts at its snapped centroid, and a message counts them.
 </td>
 <td style="text-align:left;">
 TRUE

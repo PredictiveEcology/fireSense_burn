@@ -1,7 +1,7 @@
 ---
 title: "fireSense_burn Manual"
 subtitle: "v.0.0.0.9000"
-date: "Last updated: 2026-11-23"
+date: "Last updated: 2026-11-28"
 output:
   bookdown::html_document2:
     toc: true
@@ -145,9 +145,15 @@ Table \@ref(tab:moduleInputs-fireSense_burn) shows the full list of module input
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
+   <td style="text-align:left;"> ignitionFirePoints </td>
+   <td style="text-align:left;"> SpatVector </td>
+   <td style="text-align:left;"> Only with `ignitionSource = "observedEscapes"` and `observedStartLocation = "ignitionPoint"`: the NFDB ignition points (`YEAR`, `SIZE_HA`), as in fireSense_dataPrepFit. Unsupplied, with a `studyArea`, `.inputObjects` makes them from the NFDB fires of `fireCauses` in `fireYears`. </td>
+   <td style="text-align:left;"> NA </td>
+  </tr>
+  <tr>
    <td style="text-align:left;"> studyArea </td>
    <td style="text-align:left;"> SpatVector </td>
-   <td style="text-align:left;"> Only for making `nonEscapedFireSizesHa`: the study area whose NFDB fires give the sizes. </td>
+   <td style="text-align:left;"> Only for making `nonEscapedFireSizesHa` and `ignitionFirePoints`: the study area whose NFDB fires give the sizes. </td>
    <td style="text-align:left;"> NA </td>
   </tr>
   <tr>
@@ -246,6 +252,15 @@ Summary of user-visible parameters (Table \@ref(tab:moduleParams-fireSense_burn)
    <td style="text-align:left;"> NA </td>
    <td style="text-align:left;"> NA </td>
    <td style="text-align:left;"> As in `fireSense_dataPrepFit`: the years of those observed fires, when `.inputObjects` makes `nonEscapedFireSizesHa`. </td>
+   <td style="text-align:left;"> TRUE </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> observedStartLocation </td>
+   <td style="text-align:left;"> character </td>
+   <td style="text-align:left;"> centroid </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> NA </td>
+   <td style="text-align:left;"> Only with `ignitionSource = "observedEscapes"`: where each observed escape starts. `"centroid"` (default): the snapped centroid of its polygon, the spread fit's start. `"ignitionPoint"`: the NFDB ignition point (`ignitionFirePoints`) that matches its polygon (`fireSenseUtils::ignitionPolygonPairs()`: in the polygon or within 1 km, the point inside and then the largest `SIZE_HA` first), moved to the nearest burnable pixel of the fire if it is not on one. An escape with no matched point starts at its snapped centroid, and a message counts them. </td>
    <td style="text-align:left;"> TRUE </td>
   </tr>
   <tr>
